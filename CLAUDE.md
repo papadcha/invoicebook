@@ -9,8 +9,9 @@ InvoiceBook (`invoicebook`) — a Greek-language Electron desktop app for a busi
 ## Commands
 
 - Run the app: `npm start` (launches Electron; there is no separate dev/build step — files are loaded directly, no bundler).
-- No test suite, linter, or build pipeline exists in this repo yet.
-- The Python backend has no external dependencies (`requirements.txt` — stdlib only: `sqlite3`, `json`, `csv`). It is not run standalone; Electron's main process spawns it (see below).
+- Build a distributable installer: `npm run dist` (electron-builder, configured via `build` in `package.json`). `npm run pack` builds an unpacked app directory only, for quicker local checks.
+- No test suite or linter exists in this repo yet.
+- The Python backend has no external dependencies (`requirements.txt` — stdlib only: `sqlite3`, `json`, `csv`). It is not run standalone; Electron's main process spawns it (see below). Packaged builds still expect a `python`/`python3` on the end user's `PATH` — nothing bundles a Python runtime.
 
 ## Architecture
 
@@ -21,6 +22,8 @@ InvoiceBook (`invoicebook`) — a Greek-language Electron desktop app for a busi
 **Backend layering:** `backend/bridge.py` is purely the stdio protocol handler (parses requests, dispatches to `database.py`, serializes responses). `backend/database.py` is the actual SQLite access layer — all business logic and queries live here, using a `get_db()` context manager that commits on success / rolls back on exception.
 
 **Data directory depends on packaged state.** `main.js` sets `DATA_DIR` to `app.getPath('userData')` when `app.isPackaged`, otherwise to the `backend/` folder itself (so during `npm start` dev runs, `invoicebook.db` and `pdf_store/` stay alongside the code for easy inspection/reset). This is passed to the Python side via the `INVOICEBOOK_DATA_DIR` env var, which `bridge.py` uses to place `invoicebook.db` and `pdf_store/`.
+
+**Packaging is `asar: false` on purpose.** `main.js` computes `BACKEND_DIR` as `path.join(__dirname, 'backend')` and spawns `python` against a real path in that folder. An asar archive is a single virtual file, not something an external `python` process can read from directly — keeping `asar` disabled means the packaged app's `backend/` stays a plain folder on disk and `__dirname`-based paths keep working unchanged between dev and packaged runs. The `build.files` list in `package.json` explicitly excludes `backend/invoicebook.db`, `backend/pdf_store/**`, and `__pycache__`/`*.pyc` so a local dev DB and scanned invoices never end up inside a shipped build.
 
 **Schema migrations:** `database/schema.sql` is the full current schema, applied as-is to a fresh DB. `database/migration_NNN_*.sql` files are incremental upgrades for existing DBs, tracked via `tbl_schema_version` and driven by `CURRENT_SCHEMA_VERSION` / `migration_files` in `database.py`. Bumping the schema means: add a new `migration_NNN_*.sql`, register it in `migration_files`, and increment `CURRENT_SCHEMA_VERSION` — `schema.sql` should also be updated to reflect the fresh-install end state.
 

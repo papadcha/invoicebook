@@ -1,6 +1,7 @@
 node_modules/
 __pycache__/
 *.pyc
+dist/
 
 # Real invoice data — database and scanned PDFs, not for version control
 backend/invoicebook.db

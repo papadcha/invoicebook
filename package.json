@@ -3,10 +3,41 @@
   "version": "0.1.0",
   "description": "Καταχώρηση και παρακολούθηση τιμολογίων προμηθευτών",
   "main": "main.js",
+  "author": "papadcha",
+  "license": "MIT",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^43.1.0"
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.papadcha.invoicebook",
+    "productName": "InvoiceBook",
+    "asar": false,
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "package.json",
+      "css/**/*",
+      "js/**/*",
+      "src/**/*",
+      "database/**/*",
+      "backend/**/*",
+      "!backend/invoicebook.db",
+      "!backend/pdf_store/**",
+      "!backend/__pycache__/**",
+      "!**/*.pyc"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    }
   }
 }
