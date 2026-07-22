@@ -20,7 +20,7 @@ InvoiceBook (`invoicebook`) — a Greek-language Electron desktop app for a busi
 
 **Backend layering:** `backend/bridge.py` is purely the stdio protocol handler (parses requests, dispatches to `database.py`, serializes responses). `backend/database.py` is the actual SQLite access layer — all business logic and queries live here, using a `get_db()` context manager that commits on success / rolls back on exception.
 
-**Data directory is dev-mode only.** `INVOICEBOOK_DATA_DIR` currently points at the `backend/` folder itself (so `invoicebook.db` and `pdf_store/` live alongside the code) — both `main.js` and `bridge.py` have comments marking this as a v1/dev shortcut that must switch to `app.getPath('userData')` once the app is packaged.
+**Data directory depends on packaged state.** `main.js` sets `DATA_DIR` to `app.getPath('userData')` when `app.isPackaged`, otherwise to the `backend/` folder itself (so during `npm start` dev runs, `invoicebook.db` and `pdf_store/` stay alongside the code for easy inspection/reset). This is passed to the Python side via the `INVOICEBOOK_DATA_DIR` env var, which `bridge.py` uses to place `invoicebook.db` and `pdf_store/`.
 
 **Schema migrations:** `database/schema.sql` is the full current schema, applied as-is to a fresh DB. `database/migration_NNN_*.sql` files are incremental upgrades for existing DBs, tracked via `tbl_schema_version` and driven by `CURRENT_SCHEMA_VERSION` / `migration_files` in `database.py`. Bumping the schema means: add a new `migration_NNN_*.sql`, register it in `migration_files`, and increment `CURRENT_SCHEMA_VERSION` — `schema.sql` should also be updated to reflect the fresh-install end state.
 

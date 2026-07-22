@@ -11,32 +11,31 @@ let reqCounter = 0;
 let bridgeReady = false;
 let queuedMessages = [];
 
-// Dev mode only (v1): data lives next to the backend folder — same path
-// bridge.py resolves via INVOICEBOOK_DATA_DIR below. Once packaged, both
-// should point at app.getPath('userData') instead.
+// BACKEND_DIR is where the backend *code* lives (bridge.py, database.py) —
+// this never changes. DATA_DIR is where the *data* (db, pdf_store) lives:
+// the OS user-data dir once packaged, or next to the backend folder during
+// unpackaged dev runs so it's easy to find/inspect/reset.
 const BACKEND_DIR = path.join(__dirname, 'backend');
-const PDF_STORE_DIR = path.join(BACKEND_DIR, 'pdf_store');
+const DATA_DIR = app.isPackaged ? app.getPath('userData') : BACKEND_DIR;
+const PDF_STORE_DIR = path.join(DATA_DIR, 'pdf_store');
 
 function getPythonPath() {
   return os.platform() === 'win32' ? 'python' : 'python3';
 }
 
 function startBridge() {
-  const userDataDir = app.getPath('userData');
-  fs.mkdirSync(userDataDir, { recursive: true });
+  fs.mkdirSync(DATA_DIR, { recursive: true });
 
   const backendDir = BACKEND_DIR;
   const bridgeEnv = {
     ...process.env,
     PYTHONUNBUFFERED: '1',
-    // Dev mode only (v1): data lives next to the backend folder.
-    // Once packaged, this should point at app.getPath('userData') instead.
-    INVOICEBOOK_DATA_DIR: backendDir,
+    INVOICEBOOK_DATA_DIR: DATA_DIR,
   };
 
   const cmd = getPythonPath();
   const args = [path.join(backendDir, 'bridge.py')];
-  console.log(`[Bridge] Starting dev: ${cmd} ${args[0]}`);
+  console.log(`[Bridge] Starting: ${cmd} ${args[0]} (data dir: ${DATA_DIR})`);
 
   pythonProcess = spawn(cmd, args, {
     cwd: backendDir,
