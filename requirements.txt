@@ -1,0 +1,2 @@
+# InvoiceBook backend — v1 χρησιμοποιεί μόνο την Python standard library
+# (sqlite3, json, csv). Δεν χρειάζονται εξωτερικά πακέτα προς το παρόν.

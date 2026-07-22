@@ -1,0 +1,37 @@
+<div class="page-header">
+  <h2>Εισαγωγή CSV/JSON</h2>
+  <p>Φόρτωση δομημένων δεδομένων τιμολογίων (π.χ. από ανάγνωση σαρωμένων PDF) — κάθε γραμμή περνάει από επιβεβαίωση πριν καταχωρηθεί.</p>
+</div>
+
+<div class="card">
+  <div class="card-title">Νέα Εισαγωγή</div>
+  <div class="form-row cols-2">
+    <div>
+      <label>Αρχείο</label>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button type="button" class="btn btn-outline" id="pick-file-btn">Επιλογή Αρχείου (CSV/JSON)</button>
+        <span id="picked-file-name" class="mono" style="font-size:12px; color:var(--muted);">Κανένα αρχείο</span>
+      </div>
+    </div>
+    <div>
+      <label for="batch-label">Ετικέτα Παρτίδας</label>
+      <input type="text" id="batch-label" placeholder="π.χ. Ιανουάριος 2015">
+    </div>
+  </div>
+  <div class="form-actions">
+    <button type="button" class="btn btn-primary" id="do-import-btn" disabled>Εισαγωγή</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Σε Αναμονή Επιβεβαίωσης</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Παρτίδα</th><th>Προμηθευτής</th><th>Αριθμός</th><th>Ημ/νία</th>
+        <th class="text-right">Σύνολο</th><th></th>
+      </tr></thead>
+      <tbody id="staging-body"></tbody>
+    </table>
+  </div>
+</div>

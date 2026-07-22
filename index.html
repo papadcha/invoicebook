@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InvoiceBook — Τιμολόγια</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./css/app.css">
+</head>
+<body class="electron">
+
+<!-- CUSTOM TITLEBAR -->
+<div id="titlebar">
+  <div id="titlebar-drag">🧾 InvoiceBook</div>
+  <div id="titlebar-btns">
+    <button onclick="window.api.minimize()" title="Ελαχιστοποίηση">─</button>
+    <button onclick="window.api.maximize()" title="Μεγιστοποίηση">□</button>
+    <button id="tb-close" onclick="window.api.close()" title="Κλείσιμο">✕</button>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="icon">🧾</div>
+    <h1>Invoice<br>Book</h1>
+    <p>Τιμολόγια Προμηθευτών</p>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-section">Κύριο</div>
+    <div class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
+      <span class="nav-icon">📊</span> Πίνακας Ελέγχου
+    </div>
+    <div class="nav-item" data-page="invoices" onclick="navigateTo('invoices')">
+      <span class="nav-icon">📄</span> Τιμολόγια
+    </div>
+    <div class="nav-item" data-page="suppliers" onclick="navigateTo('suppliers')">
+      <span class="nav-icon">🏭</span> Προμηθευτές
+    </div>
+    <div class="nav-section">Εισαγωγή</div>
+    <div class="nav-item" data-page="import" onclick="navigateTo('import')">
+      <span class="nav-icon">📂</span> Εισαγωγή CSV/JSON
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main class="main">
+  <div id="page-container"></div>
+</main>
+
+<!-- TOASTS -->
+<div id="toast-container" style="position:fixed; top:48px; right:20px; z-index:500; display:flex; flex-direction:column; gap:8px;"></div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-title">Επιβεβαίωση</div>
+    <p id="confirm-msg" style="margin-bottom:8px;"></p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="confirm-cancel-btn" onclick="App.closeConfirm()">Άκυρο</button>
+      <button class="btn btn-danger" id="confirm-ok-btn">Επιβεβαίωση</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./js/main-app.js"></script>
+</body>
+</html>

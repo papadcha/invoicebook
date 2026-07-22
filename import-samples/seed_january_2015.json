@@ -1,0 +1,668 @@
+[
+  {
+    "source_pdf_filename": "07-01-15 1034 Αφοι Διδή ΟΕ.pdf",
+    "supplier_name": "Αφοι Διδή ΟΕ",
+    "supplier_vat": "091515500",
+    "doc_type": "Τιμολόγιο - Δελτίο Αποστολής",
+    "doc_number": "001034",
+    "doc_date": "2015-01-07",
+    "doc_time": "13:24",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": 257.0,
+    "vat_amount": 59.11,
+    "total_amount": 316.11,
+    "payment_method": "Επί Πιστώσει",
+    "notes": null,
+    "items": [
+      {
+        "code": "1-426",
+        "description": "Ψυγείο καλοριφέρ",
+        "unit": "ΤΕΜ",
+        "quantity": 1,
+        "unit_price": 84.0,
+        "value": 84.0,
+        "vat_pct": 23
+      },
+      {
+        "code": "1-3075",
+        "description": "Μοτέρ καλοριφέρ",
+        "unit": "ΤΕΜ",
+        "quantity": 1,
+        "unit_price": 120.0,
+        "value": 120.0,
+        "vat_pct": 23
+      },
+      {
+        "code": "1-2015",
+        "description": "Βάνα",
+        "unit": "ΤΕΜ",
+        "quantity": 1,
+        "unit_price": 53.0,
+        "value": 53.0,
+        "vat_pct": 23
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "07-01-15 Αφοι Διδή ΟΕ.pdf",
+    "supplier_name": "Αφοι Διδή ΟΕ",
+    "supplier_vat": "091515500",
+    "doc_type": "Τιμολόγιο Παροχής Υπηρεσιών",
+    "doc_number": "000751",
+    "doc_date": "2015-01-07",
+    "doc_time": "13:24",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": 180.0,
+    "vat_amount": 41.4,
+    "total_amount": 221.4,
+    "payment_method": "Επί Πιστώσει",
+    "notes": "Εργασία αυτοκινήτου",
+    "items": [
+      {
+        "code": "9999",
+        "description": "Εργασία αυτοκινήτου",
+        "unit": "ΥΠΗ",
+        "quantity": 1,
+        "unit_price": 180.0,
+        "value": 180.0,
+        "vat_pct": 23
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "08-01-15 Ελένη Καραμπατζακη.pdf",
+    "supplier_name": "Ελένη Βύρωνος Καραμπατζάκη (Byron Bearings/SKF)",
+    "supplier_vat": "044507238",
+    "doc_type": "Τιμολόγιο - Δελτίο Αποστολής",
+    "doc_number": "190423",
+    "doc_date": "2015-01-08",
+    "doc_time": "15:18",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": 67.89,
+    "vat_amount": 15.61,
+    "total_amount": 83.5,
+    "payment_method": "Μετρητοίς",
+    "notes": "Έκπτωση 0,01€",
+    "items": [
+      {
+        "code": "SY.40.TF",
+        "description": "Έδρανα SKF",
+        "unit": "ΤΕΜ",
+        "quantity": 2,
+        "unit_price": 33.95,
+        "value": 67.9,
+        "vat_pct": 23
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "12-01-15 Ευαγγελος Ζαφειράκης & ΣΙΑ ΟΕ.pdf",
+    "supplier_name": "Ευάγγελος Ζαφειράκης & ΣΙΑ ΟΕ",
+    "supplier_vat": "092300178",
+    "doc_type": "Τιμολόγιο Πώλησης - Δ. Αποστολής",
+    "doc_number": "Α100-Α00065115",
+    "doc_date": "2015-01-12",
+    "doc_time": "15:59",
+    "customer_name": "ΣΙΘΩΝ ΑΕ (ΣΤΘΩΝ)",
+    "customer_vat": "094409930",
+    "net_amount": 24.88,
+    "vat_amount": 5.73,
+    "total_amount": 30.61,
+    "payment_method": "Μετρητά σε ευρώ",
+    "notes": "Έκπτωση 6,22€ επί 31,10€· ώρα παράδοσης μη ευανάγνωστη",
+    "items": [
+      {
+        "code": "30405",
+        "description": "Παξιμάδι Αυτ. ΑΞΦ DIN 985 M20",
+        "unit": "ΤΕΜ",
+        "quantity": 20,
+        "unit_price": 0.348,
+        "value": 5.5,
+        "vat_pct": null
+      },
+      {
+        "code": "13163",
+        "description": "Εξαγωνη Γαλβ. DIN 931 8.8 24x70",
+        "unit": "ΤΕΜ",
+        "quantity": 10,
+        "unit_price": 1.0335,
+        "value": 13.0,
+        "vat_pct": null
+      },
+      {
+        "code": "30407",
+        "description": "Παξιμάδι Αυτ. ΑΞΦ DIN 985 M24",
+        "unit": "ΤΕΜ",
+        "quantity": 10,
+        "unit_price": 0.74,
+        "value": 6.2,
+        "vat_pct": null
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "16-01-15 Μωραιτου Π Μωραιτου Δ ΟΕ.pdf",
+    "supplier_name": "Π. Μωραΐτου - Δ. Μωραΐτου ΟΕ",
+    "supplier_vat": "999704925",
+    "doc_type": "Τιμολόγιο Πωλ. - Δελ. Αποστολής",
+    "doc_number": "514",
+    "doc_date": "2015-01-16",
+    "doc_time": "16:36",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": null,
+    "vat_amount": null,
+    "total_amount": null,
+    "payment_method": "Εξοφλήθη",
+    "notes": "Ποσά δυσανάγνωστα στο σαρωμένο έγγραφο· νέο υπόλοιπο 0,00€",
+    "items": [
+      {
+        "code": "MAG-082",
+        "description": "Αιθέρα 3,2gr",
+        "unit": null,
+        "quantity": 1,
+        "unit_price": 4.23,
+        "value": 4.23,
+        "vat_pct": null
+      },
+      {
+        "code": "06-60",
+        "description": "Σμυριδόπανο 60",
+        "unit": null,
+        "quantity": 3,
+        "unit_price": 0.81,
+        "value": 2.12,
+        "vat_pct": null
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "19-01-15 ΡΟΔΑ ΜΕΠΕ.pdf",
+    "supplier_name": "ΡΟΔΑ ΜΕΠΕ",
+    "supplier_vat": null,
+    "doc_type": "Δελτίο Αποστολής",
+    "doc_number": "301708",
+    "doc_date": "2015-01-19",
+    "doc_time": "12:39",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": null,
+    "vat_amount": null,
+    "total_amount": null,
+    "payment_method": null,
+    "notes": "Μεταχειρισμένα ελαστικά Αντάρες 315-80-22,5, 3 τεμ. — δελτίο χωρίς αξία, σάρωση δυσανάγνωστη (σκούρο φόντο)",
+    "items": [
+      {
+        "code": null,
+        "description": "Μεταχειρισμένα ελαστικά Αντάρες 315-80-22,5",
+        "unit": "ΤΕΜ",
+        "quantity": 3,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "21-01-15 Τσεκούρας ΑΕ.pdf",
+    "supplier_name": "Τσεκούρας ΑΕ",
+    "supplier_vat": "094082219",
+    "doc_type": "Τιμολόγιο / Δελτίο Αποστολής",
+    "doc_number": "111",
+    "doc_date": "2015-01-21",
+    "doc_time": null,
+    "customer_name": "ΣΙΘΩΝ ΑΕ (Τεχνικά Έργα)",
+    "customer_vat": "094409930",
+    "net_amount": 432.38,
+    "vat_amount": 99.45,
+    "total_amount": 531.83,
+    "payment_method": "Πίστωση 60 ημερών",
+    "notes": "Έκπτωση 10% επί 480,42€· ημερομηνία δυσανάγνωστη στη σάρωση",
+    "items": [
+      {
+        "code": "15F-5603810",
+        "description": "Κομπλέρ",
+        "unit": "ΤΕΜ",
+        "quantity": 1,
+        "unit_price": 480.42,
+        "value": 432.38,
+        "vat_pct": 23
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "22-01-15 Σβάρνας Γρηγόριος.pdf",
+    "supplier_name": "Σβάρνας Ανδ. Γρηγόριος",
+    "supplier_vat": "026745282",
+    "doc_type": "Τιμολόγιο Πώλησης - Δελτίο Αποστολής",
+    "doc_number": "Α-ΤΔ00012920",
+    "doc_date": "2015-01-22",
+    "doc_time": "14:57",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": 211.38,
+    "vat_amount": 48.62,
+    "total_amount": 260.0,
+    "payment_method": "Άμεση εξόφληση - Μετρητά",
+    "notes": null,
+    "items": [
+      {
+        "code": "01-106",
+        "description": "Orestain εμπρός Π/Ζ 103cm",
+        "unit": "ΤΕΜ",
+        "quantity": 1,
+        "unit_price": 186.38,
+        "value": 186.38,
+        "vat_pct": 23
+      },
+      {
+        "code": "11-167",
+        "description": "Φούσκα λάστιχο",
+        "unit": "ΜΕΤ",
+        "quantity": 5,
+        "unit_price": 5.0,
+        "value": 25.0,
+        "vat_pct": 23
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "23-01-15 1067 Αφοι Διδή ΟΕ.pdf",
+    "supplier_name": "Αφοι Διδή ΟΕ",
+    "supplier_vat": "091515500",
+    "doc_type": "Τιμολόγιο - Δελτίο Αποστολής",
+    "doc_number": "001067",
+    "doc_date": "2015-01-23",
+    "doc_time": "09:28",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": 470.0,
+    "vat_amount": 108.1,
+    "total_amount": 578.1,
+    "payment_method": "Επί Πιστώσει",
+    "notes": null,
+    "items": [
+      {
+        "code": "1-326",
+        "description": "Πλακέτα",
+        "unit": "ΤΕΜ",
+        "quantity": 1,
+        "unit_price": 148.0,
+        "value": 148.0,
+        "vat_pct": 23
+      },
+      {
+        "code": "1-3520",
+        "description": "Πιάτο 24 ρηχό",
+        "unit": "ΤΕΜ",
+        "quantity": 6,
+        "unit_price": 9.0,
+        "value": 54.0,
+        "vat_pct": 23
+      },
+      {
+        "code": "1-36954",
+        "description": "Παντόφλα φρένου",
+        "unit": "ΤΕΜ",
+        "quantity": 1,
+        "unit_price": 120.0,
+        "value": 120.0,
+        "vat_pct": 23
+      },
+      {
+        "code": "1-3907",
+        "description": "Διακόπτης καλοριφέρ",
+        "unit": "ΤΕΜ",
+        "quantity": 1,
+        "unit_price": 50.0,
+        "value": 50.0,
+        "vat_pct": 23
+      },
+      {
+        "code": "1-9042",
+        "description": "Σετ κομφλέρ",
+        "unit": "ΣΕΤ",
+        "quantity": 1,
+        "unit_price": 98.0,
+        "value": 98.0,
+        "vat_pct": 23
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "23-01-15 1068 Αφοι Διδή ΟΕ.pdf",
+    "supplier_name": "Αφοι Διδή ΟΕ",
+    "supplier_vat": "091515500",
+    "doc_type": "Τιμολόγιο - Δελτίο Αποστολής",
+    "doc_number": "001068",
+    "doc_date": "2015-01-23",
+    "doc_time": "09:28",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": 200.0,
+    "vat_amount": 46.0,
+    "total_amount": 246.0,
+    "payment_method": "Επί Πιστώσει",
+    "notes": null,
+    "items": [
+      {
+        "code": "1-20",
+        "description": "Μίζα",
+        "unit": "ΤΕΜ",
+        "quantity": 1,
+        "unit_price": 200.0,
+        "value": 200.0,
+        "vat_pct": 23
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "23-01-15 771 Αφοι Διδή ΟΕ.pdf",
+    "supplier_name": "Αφοι Διδή ΟΕ",
+    "supplier_vat": "091515500",
+    "doc_type": "Τιμολόγιο Παροχής Υπηρεσιών",
+    "doc_number": "000771",
+    "doc_date": "2015-01-23",
+    "doc_time": "09:28",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": 230.0,
+    "vat_amount": 52.9,
+    "total_amount": 282.9,
+    "payment_method": "Επί Πιστώσει",
+    "notes": "Εργασία αυτοκινήτου",
+    "items": [
+      {
+        "code": "9999",
+        "description": "Εργασία αυτοκινήτου",
+        "unit": "ΥΠΗ",
+        "quantity": 1,
+        "unit_price": 230.0,
+        "value": 230.0,
+        "vat_pct": 23
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "26-01-15 Αφοι Σ Ιακωβίδη ΟΕ.pdf",
+    "supplier_name": "Αφοι Σ. Ιακωβίδη ΟΕ",
+    "supplier_vat": "084187116",
+    "doc_type": "Τιμολόγιο",
+    "doc_number": "7901",
+    "doc_date": "2015-01-26",
+    "doc_time": "14:5x",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": 2081.32,
+    "vat_amount": 478.7,
+    "total_amount": 2560.02,
+    "payment_method": "Πίστωση 60 ημερών",
+    "notes": "Ώρα μερικώς δυσανάγνωστη",
+    "items": [
+      {
+        "code": "P62ΘΕΑRS",
+        "description": "Σετ γρανάζια (σασμανάκι)",
+        "unit": "ΤΕΜ",
+        "quantity": 1,
+        "unit_price": 1700.0,
+        "value": 1700.0,
+        "vat_pct": null
+      },
+      {
+        "code": "P62ΣΑGΗΜ",
+        "description": "Σετ σασμάν",
+        "unit": "ΤΕΜ",
+        "quantity": 1,
+        "unit_price": 370.0,
+        "value": 370.0,
+        "vat_pct": null
+      },
+      {
+        "code": "4810",
+        "description": "Σετ στεγανά",
+        "unit": "ΤΕΜ",
+        "quantity": 1,
+        "unit_price": 5.75,
+        "value": 5.75,
+        "vat_pct": null
+      },
+      {
+        "code": "705705Ε",
+        "description": "Κόλλα φλάντζας Dirko",
+        "unit": "ΤΕΜ",
+        "quantity": 1,
+        "unit_price": 5.57,
+        "value": 5.57,
+        "vat_pct": null
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "27-01-15 Αφοι Σ Ιακωβίδη ΟΕ.pdf",
+    "supplier_name": "Αφοι Σ. Ιακωβίδη ΟΕ",
+    "supplier_vat": "084187116",
+    "doc_type": "Δικαιολογητικό Έγγρ. (μη τιμολ. αποστολή)",
+    "doc_number": "00ΔΑΠ0003752",
+    "doc_date": "2015-01-27",
+    "doc_time": "17:05",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": null,
+    "vat_amount": null,
+    "total_amount": null,
+    "payment_method": "Πίστωση 60 ημερών",
+    "notes": "Δελτίο αποστολής χωρίς τιμές — μόνο ποσότητες",
+    "items": [
+      {
+        "code": "0951575",
+        "description": "Λάστιχο 7.8 x 1.9 NR90",
+        "unit": null,
+        "quantity": 15,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      },
+      {
+        "code": "6V7350",
+        "description": "Λάστιχο 113.97 x 2.62 FR75",
+        "unit": null,
+        "quantity": 2,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "27-01-15 Βουκαλης Αθανασιος & ΣΙΑ ΟΕ.pdf",
+    "supplier_name": "Βουκάλης Αθανάσιος & ΣΙΑ ΟΕ",
+    "supplier_vat": "092429970",
+    "doc_type": "Τιμολόγιο",
+    "doc_number": "ΤΔΑ-Α-96035",
+    "doc_date": "2015-01-27",
+    "doc_time": "15:37",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": 48.78,
+    "vat_amount": 11.22,
+    "total_amount": 60.0,
+    "payment_method": "Μετρητοίς",
+    "notes": null,
+    "items": [
+      {
+        "code": "Α1-Β081ΤV",
+        "description": "Ιμάντας 17x2057mm THREE-V",
+        "unit": "ΤΕΜΑΧΙΟ",
+        "quantity": 6,
+        "unit_price": 8.13,
+        "value": 48.78,
+        "vat_pct": 23
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "27-01-15- Αφοι Σ Ιακωβίδη ΟΕ.pdf",
+    "supplier_name": "Αφοι Σ. Ιακωβίδη ΟΕ",
+    "supplier_vat": "084187116",
+    "doc_type": "Δικαιολογητικό Έγγρ. (μη τιμολ. αποστολή)",
+    "doc_number": "00ΔΑΠ0003751",
+    "doc_date": "2015-01-27",
+    "doc_time": "16:48",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": null,
+    "vat_amount": null,
+    "total_amount": null,
+    "payment_method": "Πίστωση 60 ημερών",
+    "notes": "Δελτίο αποστολής χωρίς τιμές — μόνο ποσότητες, 12 είδη",
+    "items": [
+      {
+        "code": "80X100X7",
+        "description": "Τσιμούχα",
+        "unit": null,
+        "quantity": 2,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      },
+      {
+        "code": "45X62X7",
+        "description": "Τσιμούχα",
+        "unit": null,
+        "quantity": 1,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      },
+      {
+        "code": "0.5BEL",
+        "description": "Βελανιδόχαρτο 0.5mm",
+        "unit": null,
+        "quantity": 1,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      },
+      {
+        "code": "1BEL",
+        "description": "Βελανιδόχαρτο 1mm",
+        "unit": null,
+        "quantity": 1,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      },
+      {
+        "code": "M10X20",
+        "description": "Βίδα M10x20",
+        "unit": null,
+        "quantity": 10,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      },
+      {
+        "code": "M8X25",
+        "description": "Βίδα",
+        "unit": null,
+        "quantity": 10,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      },
+      {
+        "code": "0S1588E",
+        "description": "Βίδα 3/8 x 1 1/4 NC ανοξείδωτη",
+        "unit": null,
+        "quantity": 15,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      },
+      {
+        "code": "M8X16",
+        "description": "Βίδα",
+        "unit": null,
+        "quantity": 15,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      },
+      {
+        "code": "3B4506E",
+        "description": "Γκρόβερ 3/8 ZF",
+        "unit": null,
+        "quantity": 15,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      },
+      {
+        "code": "5X2",
+        "description": "Λάστιχο 5x2",
+        "unit": null,
+        "quantity": 15,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      },
+      {
+        "code": "6X2",
+        "description": "Λάστιχο 6x2",
+        "unit": null,
+        "quantity": 15,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      },
+      {
+        "code": "7X2",
+        "description": "Λάστιχο 7x2",
+        "unit": null,
+        "quantity": 15,
+        "unit_price": null,
+        "value": null,
+        "vat_pct": null
+      }
+    ]
+  },
+  {
+    "source_pdf_filename": "29-01-15 Καλογεράκης Γ Ζακατήρας & ΣΙΑ ΟΕ.pdf",
+    "supplier_name": "Καλογεράκης Γ. - Ζακατήρας Π. & ΣΙΑ ΟΕ",
+    "supplier_vat": "084275012",
+    "doc_type": "Δελτίο Αποστολής - Τιμολόγιο",
+    "doc_number": "1348",
+    "doc_date": "2015-01-29",
+    "doc_time": "15:30",
+    "customer_name": "ΣΙΘΩΝ ΑΕ",
+    "customer_vat": "094409930",
+    "net_amount": 380.0,
+    "vat_amount": 87.4,
+    "total_amount": 467.4,
+    "payment_method": "Μετρητοίς",
+    "notes": "Χειρόγραφο παραστατικό· ποσά κατά προσέγγιση λόγω γραφικού χαρακτήρα",
+    "items": [
+      {
+        "code": null,
+        "description": "Πλάκα πίεσης C80 MO?S",
+        "unit": null,
+        "quantity": 1,
+        "unit_price": 300.0,
+        "value": 300.0,
+        "vat_pct": null
+      },
+      {
+        "code": null,
+        "description": "Σετ στεγανά",
+        "unit": null,
+        "quantity": 1,
+        "unit_price": 80.0,
+        "value": 80.0,
+        "vat_pct": null
+      }
+    ]
+  }
+]

@@ -1,0 +1,106 @@
+<div class="page-header">
+  <h2>Τιμολόγια</h2>
+  <p>Καταχώρηση και διαχείριση τιμολογίων προμηθευτών</p>
+</div>
+
+<div class="card">
+  <div class="card-title" id="inv-form-title">Νέο Τιμολόγιο</div>
+  <form id="invoice-form">
+    <input type="hidden" id="inv-id">
+    <div class="form-row cols-4">
+      <div>
+        <label for="inv-supplier">Προμηθευτής *</label>
+        <select id="inv-supplier" required></select>
+      </div>
+      <div>
+        <label for="inv-doc-type">Τύπος Παραστατικού</label>
+        <input type="text" id="inv-doc-type" placeholder="Τιμολόγιο / Δελτίο Αποστολής">
+      </div>
+      <div>
+        <label for="inv-doc-number">Αριθμός</label>
+        <input type="text" id="inv-doc-number">
+      </div>
+      <div>
+        <label for="inv-doc-date">Ημερομηνία *</label>
+        <input type="date" id="inv-doc-date" required>
+      </div>
+    </div>
+    <div class="form-row cols-4">
+      <div>
+        <label for="inv-doc-time">Ώρα</label>
+        <input type="time" id="inv-doc-time">
+      </div>
+      <div>
+        <label for="inv-payment">Τρόπος Πληρωμής</label>
+        <input type="text" id="inv-payment">
+      </div>
+      <div>
+        <label for="inv-net">Καθαρή Αξία (€)</label>
+        <input type="number" step="0.01" id="inv-net">
+      </div>
+      <div>
+        <label for="inv-vat">ΦΠΑ (€)</label>
+        <input type="number" step="0.01" id="inv-vat">
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div>
+        <label for="inv-total">Σύνολο (€)</label>
+        <input type="number" step="0.01" id="inv-total">
+      </div>
+      <div>
+        <label for="inv-notes">Σημειώσεις</label>
+        <input type="text" id="inv-notes">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div>
+        <label>Σαρωμένο Τιμολόγιο (PDF)</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button type="button" class="btn btn-outline btn-sm" id="pick-pdf-btn">Επισύναψη PDF</button>
+          <button type="button" class="btn btn-outline btn-sm" id="open-pdf-btn" style="display:none;">Άνοιγμα PDF</button>
+          <span id="pdf-status" class="mono" style="font-size:12px; color:var(--muted);">Κανένα αρχείο</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-title" style="margin-top:20px;">Είδη</div>
+    <div class="table-wrap">
+      <table class="items-table">
+        <thead><tr>
+          <th>Κωδικός</th><th>Περιγραφή</th><th>Μ.Μ.</th>
+          <th>Ποσότητα</th><th>Τιμή Μον.</th><th>Αξία</th><th></th>
+        </tr></thead>
+        <tbody id="items-body"></tbody>
+      </table>
+    </div>
+    <button type="button" class="btn btn-outline btn-sm mt-8" id="add-item-btn">+ Προσθήκη Είδους</button>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary" id="inv-save-btn">Αποθήκευση</button>
+      <button type="button" class="btn btn-outline" id="inv-clear-btn">Καθαρισμός</button>
+    </div>
+  </form>
+</div>
+
+<div class="filter-bar">
+  <div class="f-item"><label>Από</label><input type="date" id="filter-from"></div>
+  <div class="f-item"><label>Έως</label><input type="date" id="filter-to"></div>
+  <div class="f-item"><label>Προμηθευτής</label><select id="filter-supplier"><option value="">Όλοι</option></select></div>
+  <button class="btn btn-outline" id="filter-btn">Φίλτρο</button>
+  <button class="btn btn-outline" id="filter-clear-btn">Καθαρισμός</button>
+</div>
+
+<div class="card">
+  <div class="card-title">Λίστα Τιμολογίων</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Ημ/νία</th><th>Προμηθευτής</th><th>Τύπος</th><th>Αριθμός</th>
+        <th class="text-right">Σύνολο</th><th></th>
+      </tr></thead>
+      <tbody id="invoices-body"></tbody>
+    </table>
+  </div>
+</div>

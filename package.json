@@ -1,0 +1,12 @@
+{
+  "name": "invoicebook",
+  "version": "0.1.0",
+  "description": "Καταχώρηση και παρακολούθηση τιμολογίων προμηθευτών",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^43.1.0"
+  }
+}
