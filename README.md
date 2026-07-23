@@ -31,7 +31,7 @@ npm start
 
 ## Κατάσταση
 
-Έκδοση v0.1 (development). Ο φάκελος δεδομένων (βάση SQLite + αποθηκευμένα PDF) είναι προσωρινά μέσα στο `backend/` — πριν από οποιοδήποτε packaging της εφαρμογής για διανομή, αυτό πρέπει να μετακινηθεί σε φάκελο χρήστη (`app.getPath('userData')`).
+Έκδοση v0.1 (development). Σε packaged builds ο φάκελος δεδομένων (βάση SQLite + αποθηκευμένα PDF) βρίσκεται στον φάκελο χρήστη (`app.getPath('userData')`)· κατά την ανάπτυξη (`npm start`) παραμένει μέσα στο `backend/` για εύκολη επιθεώρηση/επαναφορά. Το packaging για διανομή γίνεται με `npm run dist` (electron-builder).
 
 ## Άδεια
 
