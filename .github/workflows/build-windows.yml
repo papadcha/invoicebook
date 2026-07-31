@@ -1,0 +1,31 @@
+name: Build Windows installer
+
+# Χειροκίνητο trigger — καλείται από το tab Actions του GitHub repo
+# ("Run workflow"), από οποιοδήποτε μηχάνημα. Χωρίς PyInstaller βήμα —
+# το backend τρέχει με system python στο τέλος (βλ. CLAUDE.md), δεν
+# μπαίνει compiled στο installer.
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: Build installer
+        run: npm run dist
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: InvoiceBook-Setup
+          path: dist/*.exe
+          if-no-files-found: error
