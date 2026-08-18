@@ -342,6 +342,51 @@ def attach_pdf(invoice_id, source_path):
         return stored_name
 
 
+def get_invoice_items_by_category(category, date_from=None, date_to=None):
+    """Μία γραμμή ανά αποτέλεσμα (item), με τα header πεδία του τιμολογίου του
+    "flattened" πάνω — ισοδύναμο του πρώην fuel domain's list_invoices(), αλλά σε
+    επίπεδο γραμμής (ένα τιμολόγιο μπορεί να συνεισφέρει 0, 1 ή πολλές γραμμές
+    στην ίδια κατηγορία). Χρησιμοποιείται από τα tabs Καύσιμα/Επισκευές/... του
+    intake-tool για αναζήτηση/περιήγηση/διόρθωση ανά κατηγορία."""
+    with get_db() as conn:
+        q = '''SELECT it.id as item_id, it.code, it.description, it.unit, it.quantity,
+                      it.unit_price, it.value, it.vat_pct, it.category, it.machine_id,
+                      it.efk_eligible, m.name as machine_name,
+                      i.id as invoice_id, i.doc_type, i.doc_number, i.doc_date, i.doc_time,
+                      i.customer_name, i.customer_vat, i.customer_doy, i.customer_address,
+                      i.customer_phone, i.net_amount, i.vat_amount, i.total_amount,
+                      i.payment_method, i.notes, i.source_pdf_filename,
+                      s.name as supplier_name, s.vat_number as supplier_vat
+               FROM tbl_invoice_items it
+               JOIN tbl_invoices i ON i.id = it.invoice_id
+               LEFT JOIN tbl_suppliers s ON s.id = i.supplier_id
+               LEFT JOIN tbl_machines m ON m.id = it.machine_id
+               WHERE it.category = ?'''
+        params = [category]
+        if date_from:
+            q += ' AND i.doc_date >= ?'
+            params.append(date_from)
+        if date_to:
+            q += ' AND i.doc_date <= ?'
+            params.append(date_to)
+        q += ' ORDER BY i.doc_date DESC, i.id DESC'
+        rows = conn.execute(q, params).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d['pdf_available'] = _pdf_available(d.get('source_pdf_filename'))
+            out.append(d)
+        return out
+
+
+def list_categories():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT category FROM tbl_invoice_items WHERE category IS NOT NULL AND category != '' ORDER BY category"
+        ).fetchall()
+        return [r['category'] for r in rows]
+
+
 # ── ΜΗΧΑΝΗΜΑΤΑ / ΣΤΟΧΟΙ ΔΙΑΜΟΙΡΑΣΜΟΥ ──────────────────────────────────────────
 # Απλή λίστα, ίδιο μοτίβο με tbl_suppliers — "Μπιτόνι"/"Απόθεμα" είναι απλά μία
 # ακόμα εγγραφή εδώ, όχι πραγματικό μηχάνημα· ο χειριστής προσθέτει ό,τι βολεύει.
