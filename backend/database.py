@@ -342,12 +342,13 @@ def attach_pdf(invoice_id, source_path):
         return stored_name
 
 
-def get_invoice_items_by_category(category, date_from=None, date_to=None):
+def get_invoice_items_by_category(category=None, date_from=None, date_to=None):
     """Μία γραμμή ανά αποτέλεσμα (item), με τα header πεδία του τιμολογίου του
     "flattened" πάνω — ισοδύναμο του πρώην fuel domain's list_invoices(), αλλά σε
     επίπεδο γραμμής (ένα τιμολόγιο μπορεί να συνεισφέρει 0, 1 ή πολλές γραμμές
     στην ίδια κατηγορία). Χρησιμοποιείται από τα tabs Καύσιμα/Επισκευές/... του
-    intake-tool για αναζήτηση/περιήγηση/διόρθωση ανά κατηγορία."""
+    intake-tool για αναζήτηση/περιήγηση/διόρθωση ανά κατηγορία. category=None
+    (ή κενό) = καμία στήλωση κατηγορίας — "Όλες" στο UI."""
     with get_db() as conn:
         q = '''SELECT it.id as item_id, it.code, it.description, it.unit, it.quantity,
                       it.unit_price, it.value, it.vat_pct, it.category, it.machine_id,
@@ -361,8 +362,11 @@ def get_invoice_items_by_category(category, date_from=None, date_to=None):
                JOIN tbl_invoices i ON i.id = it.invoice_id
                LEFT JOIN tbl_suppliers s ON s.id = i.supplier_id
                LEFT JOIN tbl_machines m ON m.id = it.machine_id
-               WHERE it.category = ?'''
-        params = [category]
+               WHERE 1=1'''
+        params = []
+        if category:
+            q += ' AND it.category = ?'
+            params.append(category)
         if date_from:
             q += ' AND i.doc_date >= ?'
             params.append(date_from)
