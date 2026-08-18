@@ -241,6 +241,13 @@ def add_invoice(header, items=None):
 
 
 def update_invoice(invoice_id, header, items=None):
+    """items με 'id' (υπάρχουσα γραμμή) γίνονται UPDATE in-place — κρατάει
+    σταθερό το id ώστε τυχόν tbl_bulk_pools.invoice_item_id FK να μην κοπεί
+    (ON DELETE CASCADE θα διέγραφε αθόρυβα το ιστορικό διαμοιρασμού). items
+    χωρίς 'id' εισάγονται ως νέα. Γραμμές που υπήρχαν αλλά δεν εμφανίζονται
+    καθόλου στη νέα λίστα διαγράφονται — ίδια συμπεριφορά "πλήρης
+    αντικατάσταση" με πριν για callers που δεν στέλνουν ποτέ 'id' (π.χ. το
+    ήδη υπάρχον native UI του invoicebook)."""
     with get_db() as conn:
         duplicate = _find_duplicate(conn, header, exclude_id=invoice_id)
         if duplicate is not None:
@@ -263,17 +270,37 @@ def update_invoice(invoice_id, header, items=None):
              header.get('total_amount'), header.get('payment_method'), header.get('notes'),
              header.get('source_pdf_filename'), _now(), invoice_id)
         )
-        conn.execute('DELETE FROM tbl_invoice_items WHERE invoice_id=?', (invoice_id,))
+
+        keep_ids = set()
         for it in (items or []):
-            conn.execute(
-                '''INSERT INTO tbl_invoice_items
-                   (invoice_id, code, description, unit, quantity, unit_price, value, vat_pct,
-                    category, machine_id, efk_eligible)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                (invoice_id, it.get('code'), it.get('description') or '', it.get('unit'),
-                 it.get('quantity'), it.get('unit_price'), it.get('value'), it.get('vat_pct'),
-                 it.get('category'), it.get('machine_id'), bool(it.get('efk_eligible')))
-            )
+            item_id = it.get('id')
+            if item_id:
+                conn.execute(
+                    '''UPDATE tbl_invoice_items SET code=?, description=?, unit=?, quantity=?,
+                       unit_price=?, value=?, vat_pct=?, category=?, machine_id=?, efk_eligible=?
+                       WHERE id=? AND invoice_id=?''',
+                    (it.get('code'), it.get('description') or '', it.get('unit'), it.get('quantity'),
+                     it.get('unit_price'), it.get('value'), it.get('vat_pct'), it.get('category'),
+                     it.get('machine_id'), bool(it.get('efk_eligible')), item_id, invoice_id)
+                )
+                keep_ids.add(item_id)
+            else:
+                cur = conn.execute(
+                    '''INSERT INTO tbl_invoice_items
+                       (invoice_id, code, description, unit, quantity, unit_price, value, vat_pct,
+                        category, machine_id, efk_eligible)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                    (invoice_id, it.get('code'), it.get('description') or '', it.get('unit'),
+                     it.get('quantity'), it.get('unit_price'), it.get('value'), it.get('vat_pct'),
+                     it.get('category'), it.get('machine_id'), bool(it.get('efk_eligible')))
+                )
+                keep_ids.add(cur.lastrowid)
+
+        existing_ids = {r['id'] for r in conn.execute(
+            'SELECT id FROM tbl_invoice_items WHERE invoice_id=?', (invoice_id,)
+        ).fetchall()}
+        for stale_id in existing_ids - keep_ids:
+            conn.execute('DELETE FROM tbl_invoice_items WHERE id=?', (stale_id,))
 
 
 def delete_invoice(invoice_id):
@@ -413,6 +440,44 @@ def _find_or_create_machine(conn, name):
 
 # ── ΕΙΣΑΓΩΓΗ (STAGING) ────────────────────────────────────────────────────────
 
+def _resolve_header(conn, data):
+    supplier_id = _find_or_create_supplier(conn, data.get('supplier_name'), data.get('supplier_vat'))
+    return {
+        'supplier_id': supplier_id,
+        'doc_type': data.get('doc_type'),
+        'doc_number': data.get('doc_number'),
+        'doc_date': data.get('doc_date'),
+        'doc_time': data.get('doc_time'),
+        'customer_name': data.get('customer_name'),
+        'customer_vat': data.get('customer_vat'),
+        'customer_doy': data.get('customer_doy'),
+        'customer_address': data.get('customer_address'),
+        'customer_phone': data.get('customer_phone'),
+        'net_amount': data.get('net_amount'),
+        'vat_amount': data.get('vat_amount'),
+        'total_amount': data.get('total_amount'),
+        'payment_method': data.get('payment_method'),
+        'notes': data.get('notes'),
+        'source_pdf_filename': data.get('source_pdf_filename'),
+    }
+
+
+def _resolve_items(conn, items):
+    """machine_id λύνεται από machine_name ΜΟΝΟ όταν το κλειδί υπάρχει (ρητά
+    δοσμένο από τον χειριστή/staging JSON) — αλλιώς μένει ό,τι ήδη έχει το item
+    dict (π.χ. ήδη-resolved machine_id από γραμμή που διαβάστηκε από τη βάση,
+    βλ. update_invoice_from_data). Χωρίς αυτή τη διάκριση, μια αναγγική γραμμή
+    θα έχανε το machine_id της κάθε φορά που ενημερώνεται μια ΑΛΛΗ γραμμή του
+    ίδιου τιμολογίου."""
+    resolved = []
+    for it in items:
+        r = dict(it)
+        if 'machine_name' in r:
+            r['machine_id'] = _find_or_create_machine(conn, r.get('machine_name'))
+        resolved.append(r)
+    return resolved
+
+
 def _find_or_create_supplier(conn, name, vat_number=None):
     if not name:
         return None
@@ -473,30 +538,8 @@ def confirm_staging_row(staging_id):
             raise ValueError('Η εγγραφή έχει ήδη επεξεργαστεί')
         data = json.loads(row['raw_json'])
         items = data.pop('items', []) or []
-        supplier_id = _find_or_create_supplier(conn, data.get('supplier_name'), data.get('supplier_vat'))
-        resolved_items = []
-        for it in items:
-            resolved = dict(it)
-            resolved['machine_id'] = _find_or_create_machine(conn, it.get('machine_name'))
-            resolved_items.append(resolved)
-        header = {
-            'supplier_id': supplier_id,
-            'doc_type': data.get('doc_type'),
-            'doc_number': data.get('doc_number'),
-            'doc_date': data.get('doc_date'),
-            'doc_time': data.get('doc_time'),
-            'customer_name': data.get('customer_name'),
-            'customer_vat': data.get('customer_vat'),
-            'customer_doy': data.get('customer_doy'),
-            'customer_address': data.get('customer_address'),
-            'customer_phone': data.get('customer_phone'),
-            'net_amount': data.get('net_amount'),
-            'vat_amount': data.get('vat_amount'),
-            'total_amount': data.get('total_amount'),
-            'payment_method': data.get('payment_method'),
-            'notes': data.get('notes'),
-            'source_pdf_filename': data.get('source_pdf_filename'),
-        }
+        header = _resolve_header(conn, data)
+        resolved_items = _resolve_items(conn, items)
         invoice_id = _insert_invoice(conn, header, resolved_items)
 
         inserted_item_rows = conn.execute(
@@ -513,6 +556,31 @@ def confirm_staging_row(staging_id):
 def reject_staging_row(staging_id):
     with get_db() as conn:
         conn.execute("UPDATE tbl_import_staging SET status='rejected' WHERE id=?", (staging_id,))
+
+
+def update_invoice_from_data(invoice_id, data):
+    """Ίδιο raw σχήμα με ένα staging row (ονόματα προμηθευτή/μηχανήματος, όχι
+    ids) — το UI της διόρθωσης δεν χρειάζεται δική του λογική resolution.
+    data['items'] περιέχει ΜΟΝΟ τη γραμμή που επεξεργάζεται ο χειριστής (με
+    'id' αν είναι ήδη υπάρχουσα) — τυχόν άλλες γραμμές του ίδιου τιμολογίου
+    διαβάζονται από τη βάση και μένουν αμετάβλητες (ίδιο id, βλ.
+    update_invoice — δεν κόβεται το FK τυχόν bulk pool τους)."""
+    with get_db() as conn:
+        existing_items = [dict(r) for r in conn.execute(
+            'SELECT * FROM tbl_invoice_items WHERE invoice_id=? ORDER BY id', (invoice_id,)
+        ).fetchall()]
+        edited_by_id = {it.get('id'): it for it in (data.get('items') or []) if it.get('id')}
+        merged_items = [edited_by_id.pop(ex['id'], ex) for ex in existing_items]
+        for it in edited_by_id.values():
+            it = dict(it)
+            it.pop('id', None)  # δεν ταίριαξε σε υπάρχουσα γραμμή -> νέα εγγραφή
+            merged_items.append(it)
+
+        header = _resolve_header(conn, data)
+        resolved_items = _resolve_items(conn, merged_items)
+
+    update_invoice(invoice_id, header, resolved_items)
+    return invoice_id
 
 
 # ── ΜΑΖΙΚΕΣ ΚΑΤΑΧΩΡΗΣΕΙΣ / ΔΙΑΜΟΙΡΑΣΜΟΣ (2 στάδια) ────────────────────────────
