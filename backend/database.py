@@ -304,7 +304,24 @@ def update_invoice(invoice_id, header, items=None):
 
 
 def delete_invoice(invoice_id):
+    """Διαγράφει ολόκληρο το τιμολόγιο (header + όλες τις γραμμές του, μέσω
+    ON DELETE CASCADE). Μπλοκάρει αν κάποια bulk γραμμή του έχει ήδη
+    διαμοιρασμό σε μηχανήματα (tbl_allocations) — το cascade θα το έσβηνε
+    αθόρυβα μαζί (ίδιος κίνδυνος με το παλιό update_invoice bug, βλ. πάνω),
+    κι αυτό είναι πραγματικό ιστορικό κατανάλωσης, όχι απλά staging data."""
     with get_db() as conn:
+        alloc_count = conn.execute(
+            '''SELECT COUNT(*) FROM tbl_allocations a
+               JOIN tbl_bulk_pools p ON p.id = a.pool_id
+               JOIN tbl_invoice_items it ON it.id = p.invoice_item_id
+               WHERE it.invoice_id = ?''', (invoice_id,)
+        ).fetchone()[0]
+        if alloc_count:
+            raise ValueError(
+                f'Δεν διαγράφεται — υπάρχουν {alloc_count} καταχωρημένοι διαμοιρασμοί σε '
+                f'μηχανήματα πάνω σε bulk γραμμή αυτού του τιμολογίου. Αναίρεσε πρώτα τους '
+                f'διαμοιρασμούς (tab Αποθέματα προς Διαμοιρασμό) αν πραγματικά χρειάζεται διαγραφή.'
+            )
         conn.execute('DELETE FROM tbl_invoices WHERE id=?', (invoice_id,))
 
 
