@@ -495,12 +495,28 @@ def _resolve_items(conn, items):
     return resolved
 
 
+def _normalize_vat(v):
+    """Αγνοεί το πρόθεμα χώρας ("EL") και κενά/παύλες — "EL094119164" και
+    "094119164" πρέπει να ταιριάζουν στον ίδιο προμηθευτή (βλ. διπλότυπο
+    ΠΑΠΑΝΤΩΝΙΟΥ Α.Β.Ε.Ε., 2026-08-23)."""
+    if not v:
+        return None
+    v = str(v).strip().upper().replace(' ', '').replace('-', '')
+    if v.startswith('EL'):
+        v = v[2:]
+    return v or None
+
+
 def _find_or_create_supplier(conn, name, vat_number=None):
     if not name:
         return None
     row = None
-    if vat_number:
-        row = conn.execute('SELECT id FROM tbl_suppliers WHERE vat_number=?', (vat_number,)).fetchone()
+    norm_vat = _normalize_vat(vat_number)
+    if norm_vat:
+        for r in conn.execute('SELECT id, vat_number FROM tbl_suppliers WHERE vat_number IS NOT NULL'):
+            if _normalize_vat(r['vat_number']) == norm_vat:
+                row = r
+                break
     if not row:
         row = conn.execute('SELECT id FROM tbl_suppliers WHERE name=?', (name,)).fetchone()
     if row:
