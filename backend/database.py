@@ -326,6 +326,26 @@ def delete_invoice(invoice_id):
         conn.execute('DELETE FROM tbl_invoices WHERE id=?', (invoice_id,))
 
 
+def delete_invoice_item(item_id):
+    """Διαγράφει ΜΙΑ γραμμή τιμολογίου (όχι όλο το τιμολόγιο) — π.χ. όταν μια
+    γραμμή αποδεικνύεται εντελώς λάθος/διπλή κατά τη διόρθωση, όχι απλά με
+    λάθος τιμές. Ίδιος έλεγχος ασφαλείας με το delete_invoice: μπλοκάρει αν η
+    γραμμή έχει ήδη bulk διαμοιρασμό σε μηχανήματα."""
+    with get_db() as conn:
+        alloc_count = conn.execute(
+            '''SELECT COUNT(*) FROM tbl_allocations a
+               JOIN tbl_bulk_pools p ON p.id = a.pool_id
+               WHERE p.invoice_item_id = ?''', (item_id,)
+        ).fetchone()[0]
+        if alloc_count:
+            raise ValueError(
+                f'Δεν διαγράφεται — υπάρχουν {alloc_count} καταχωρημένοι διαμοιρασμοί σε '
+                f'μηχανήματα πάνω σε αυτή τη bulk γραμμή. Αναίρεσε πρώτα τους διαμοιρασμούς '
+                f'(tab Αποθέματα προς Διαμοιρασμό) αν πραγματικά χρειάζεται διαγραφή.'
+            )
+        conn.execute('DELETE FROM tbl_invoice_items WHERE id=?', (item_id,))
+
+
 # ── PDF ΣΑΡΩΜΕΝΩΝ ΤΙΜΟΛΟΓΙΩΝ ──────────────────────────────────────────────────
 # "Υιοθέτηση" — το αρχείο ΜΕΤΑΚΙΝΕΙΤΑΙ (όχι αντιγραφή) μέσα στο pdf_store της
 # εφαρμογής, ώστε να μην εξαρτόμαστε από το αν θα μείνει εκεί που ήταν αρχικά.
@@ -595,20 +615,30 @@ def reject_staging_row(staging_id):
 def update_invoice_from_data(invoice_id, data):
     """Ίδιο raw σχήμα με ένα staging row (ονόματα προμηθευτή/μηχανήματος, όχι
     ids) — το UI της διόρθωσης δεν χρειάζεται δική του λογική resolution.
-    data['items'] περιέχει ΜΟΝΟ τη γραμμή που επεξεργάζεται ο χειριστής (με
-    'id' αν είναι ήδη υπάρχουσα) — τυχόν άλλες γραμμές του ίδιου τιμολογίου
-    διαβάζονται από τη βάση και μένουν αμετάβλητες (ίδιο id, βλ.
-    update_invoice — δεν κόβεται το FK τυχόν bulk pool τους)."""
+    data['items'] μπορεί να περιέχει είτε ΜΙΑ γραμμή (παλιό μοτίβο: μόνο αυτή
+    που επεξεργάζεται ο χειριστής, με 'id' αν είναι ήδη υπάρχουσα — τυχόν
+    άλλες γραμμές του ίδιου τιμολογίου διαβάζονται από τη βάση και μένουν
+    αμετάβλητες, ίδιο id, βλ. update_invoice — δεν κόβεται το FK τυχόν bulk
+    pool τους) είτε ΟΛΕΣ τις γραμμές μαζί (νέο invoice-editor UI). Γραμμές
+    ΧΩΡΙΣ 'id' εισάγονται πάντα ως καινούριες — βλ. bug 2026-08-26: πριν
+    αυτή τη διόρθωση, μια γραμμή χωρίς 'id' έχανε αθόρυβα κάθε ίχνος της
+    (ποτέ δεν έφτανε στο update_invoice), αφού μόνο απευθείας edited_by_id
+    (κλειδωμένο σε υπάρχον id) περνούσε στο merged_items — ήταν λανθάνον
+    γιατί το παλιό μονο-γραμμής modal πάντα έστελνε 'id'."""
     with get_db() as conn:
         existing_items = [dict(r) for r in conn.execute(
             'SELECT * FROM tbl_invoice_items WHERE invoice_id=? ORDER BY id', (invoice_id,)
         ).fetchall()]
-        edited_by_id = {it.get('id'): it for it in (data.get('items') or []) if it.get('id')}
+        submitted_items = data.get('items') or []
+        new_items = [it for it in submitted_items if not it.get('id')]
+        edited_by_id = {it.get('id'): it for it in submitted_items if it.get('id')}
         merged_items = [edited_by_id.pop(ex['id'], ex) for ex in existing_items]
         for it in edited_by_id.values():
             it = dict(it)
             it.pop('id', None)  # δεν ταίριαξε σε υπάρχουσα γραμμή -> νέα εγγραφή
             merged_items.append(it)
+        for it in new_items:
+            merged_items.append(dict(it))
 
         header = _resolve_header(conn, data)
         resolved_items = _resolve_items(conn, merged_items)
