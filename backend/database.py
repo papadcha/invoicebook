@@ -709,3 +709,115 @@ def get_summary(year=None, month=None):
         q += ' GROUP BY yr, mo ORDER BY yr DESC, mo DESC'
         rows = conn.execute(q, params).fetchall()
         return [dict(r) for r in rows]
+
+
+# ── ΕΛΕΓΧΟΣ ΠΟΙΟΤΗΤΑΣ / STATUS ──────────────────────────────────────────────
+
+def get_flagged_invoices():
+    """Τιμολόγια με πιθανά προβλήματα δεδομένων, ένα πέρασμα πάνω σε όλα τα
+    τιμολόγια — μικρό dataset σε αυτή την κλίμακα, δεν χρειάζεται caching.
+    Σειρά προτεραιότητας ανά τιμολόγιο: διπλότυπο > σοβαρό > μέτριο.
+    - διπλότυπο: ίδιο (doc_number, doc_date, supplier_id) με άλλο τιμολόγιο
+      (ίδια λογική με το _find_duplicate(), εδώ ως group query).
+    - σοβαρό: υπάρχει γραμμή με "[ΑΓΝΩΣΤΟ" στην περιγραφή (το placeholder
+      μοτίβο για δυσανάγνωστες σαρώσεις), ή SUM(items.value) αποκλίνει από
+      το net_amount πέρα από ό,τι θα μπορούσε να εξηγηθεί ως ΕΞΟΔΑ/μεταφορικά
+      (>20€ ή >5% του net_amount — το ΕΞΟΔΑ δεν είναι δικό του πεδίο στη
+      βάση, μόνο στο τυπωμένο χαρτί, οπότε αυτό είναι ευριστικό όριο).
+    - μέτριο: μικρότερη αναντιστοιχία εντός του παραπάνω ορίου (πιθανό
+      ΕΞΟΔΑ, μη επιβεβαιωμένο), ή γραμμή με ποσότητα αλλά χωρίς τιμή που δεν
+      είναι γνωστή νόμιμη εξαίρεση (ΠΕΡΙΒ.ΕΙΣΦΟΡΑ, ή τιμολόγιο χωρίς
+      net_amount συνολικά — price-less delivery note, αναμενόμενο)."""
+    with get_db() as conn:
+        invoices = conn.execute('''
+            SELECT i.id, i.doc_number, i.doc_date, i.net_amount, s.name as supplier_name
+            FROM tbl_invoices i
+            LEFT JOIN tbl_suppliers s ON s.id = i.supplier_id
+        ''').fetchall()
+
+        dup_rows = conn.execute('''
+            SELECT GROUP_CONCAT(id) as ids
+            FROM tbl_invoices
+            WHERE doc_number IS NOT NULL AND doc_number != ''
+            GROUP BY doc_number, doc_date, supplier_id
+            HAVING COUNT(*) > 1
+        ''').fetchall()
+        duplicate_ids = set()
+        for r in dup_rows:
+            duplicate_ids.update(int(x) for x in r['ids'].split(','))
+
+        items_by_invoice = {}
+        for it in conn.execute(
+            'SELECT invoice_id, description, quantity, value FROM tbl_invoice_items'
+        ).fetchall():
+            items_by_invoice.setdefault(it['invoice_id'], []).append(it)
+
+    flagged = []
+    for inv in invoices:
+        inv_id = inv['id']
+        net_amount = inv['net_amount']
+        items = items_by_invoice.get(inv_id, [])
+        severity = None
+        reason = None
+
+        if inv_id in duplicate_ids:
+            severity = 'duplicate'
+            reason = 'Διπλότυπο (ίδιο doc_number/ημερομηνία/προμηθευτή)'
+        else:
+            has_unknown_line = any(
+                it['description'] and '[ΑΓΝΩΣΤΟ' in it['description'] for it in items
+            )
+            diff = None
+            if net_amount is not None:
+                item_sum = sum(it['value'] for it in items if it['value'] is not None)
+                diff = abs(item_sum - net_amount)
+
+            if has_unknown_line:
+                severity = 'severe'
+                reason = 'Δυσανάγνωστη/άγνωστη γραμμή'
+            elif diff is not None and diff > max(20.0, 0.05 * net_amount):
+                severity = 'severe'
+                reason = f'Αναντιστοιχία {diff:.2f}€ (γραμμές έναντι net_amount)'
+            elif diff is not None and diff > 0.01:
+                severity = 'moderate'
+                reason = f'Μικρή αναντιστοιχία {diff:.2f}€ (πιθανό ΕΞΟΔΑ, μη επιβεβαιωμένο)'
+            elif net_amount is not None:
+                missing_value_line = any(
+                    it['quantity'] is not None and it['value'] is None and
+                    (not it['description'] or 'ΕΙΣΦΟΡΑ' not in it['description'])
+                    for it in items
+                )
+                if missing_value_line:
+                    severity = 'moderate'
+                    reason = 'Γραμμή με ποσότητα χωρίς τιμή'
+
+        if severity:
+            flagged.append({
+                'invoice_id': inv_id,
+                'doc_number': inv['doc_number'],
+                'doc_date': inv['doc_date'],
+                'supplier_name': inv['supplier_name'],
+                'net_amount': net_amount,
+                'severity': severity,
+                'reason': reason,
+            })
+    return flagged
+
+
+def get_invoice_status_summary():
+    with get_db() as conn:
+        total_invoices = conn.execute('SELECT COUNT(*) as c FROM tbl_invoices').fetchone()['c']
+        by_category = [dict(r) for r in conn.execute('''
+            SELECT category, COUNT(DISTINCT invoice_id) as count
+            FROM tbl_invoice_items
+            WHERE category IS NOT NULL AND category != ''
+            GROUP BY category ORDER BY count DESC
+        ''').fetchall()]
+    flagged = get_flagged_invoices()
+    return {
+        'total_invoices': total_invoices,
+        'by_category': by_category,
+        'flagged_severe': sum(1 for f in flagged if f['severity'] == 'severe'),
+        'flagged_moderate': sum(1 for f in flagged if f['severity'] == 'moderate'),
+        'flagged_duplicate': sum(1 for f in flagged if f['severity'] == 'duplicate'),
+    }
