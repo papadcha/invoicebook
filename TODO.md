@@ -1,39 +1,74 @@
 # TODO
 
-- [ ] Presence detection μέσω MEGA/rclone sync — κάθε client γράφει periodic
-      heartbeat (`presence.json`: user, last_seen, computer) στο ίδιο MEGA
-      remote που θα χρησιμοποιείται και για DB backup/sync. Sync στην
-      εκκίνηση + κάθε 1-2 λεπτά όσο τρέχει η εφαρμογή. UI: "● online" αν
-      `last_seen` < 2 λεπτά, αλλιώς "τελευταία σύνδεση: πριν Χ".
+Ενιαία λίστα εκκρεμοτήτων για τα 3 repos του project Γαλάτιστας
+(`intake-tool`, `invoices`/invoicebook, `report-tool`) — το ίδιο αρχείο
+διατηρείται και στα τρία, ώστε να είναι διαθέσιμο όποιο repo κι αν έχεις
+ανοιχτό. Βλ. `DONE.md` για ό,τι έχει ήδη ολοκληρωθεί.
 
-      Ενημέρωση 2026-08-01: υπάρχουν πλέον **δύο** ολοκληρωμένες reference
-      υλοποιήσεις να επιλεγεί ανάλογα με το ποια ταιριάζει καλύτερα στην
-      αρχιτεκτονική του invoicebook —
-      - `expvault` (branch `v2`, `backend/presence.py`): rclone κλήσεις
-        μέσα από το Python backend (`send_heartbeat()`/`list_presence()`,
-        heartbeat key `<computer>__<user>.json` — όχι μόνο hostname, ώστε
-        δύο μηχανήματα με ίδιο default hostname να μην
-        αλληλοεπικαλύπτονται). Sidebar UI: πράσινο/κόκκινο status button
-        στην κορυφή του sidebar, ακριβώς κάτω από το app icon + έκδοση
-        (`#sidebar-presence`, βλ. `DONE-v2.md`'s "Sidebar/titlebar
-        redesign" section) — click πλοηγεί στον αναλυτικό πίνακα της
-        σελίδας Backup. Νέα bridge εντολή `whoami` ώστε το renderer να
-        εξαιρεί το δικό του heartbeat από το "υπάρχει *άλλος* online".
-      - `lab-galatista` (`modules/presence.js`): ίδιο pattern αλλά rclone
-        κλήσεις απευθείας από το Electron main process (JS), κατά το
-        πρότυπο του ήδη υπάρχοντος `modules/cloud-sync.js` εκεί
-        (IPC handlers `cloud-test`/`cloud-sync`). Ίδιο sidebar badge
-        design (`#sidebar-presence-badge`, πράσινο "Μόνος" / κόκκινο "Χ
-        online", click → Ρυθμίσεις).
+## [invoicebook] Λάδια/Λιπαντικά reconciliation — σε εξέλιξη
 
-      Και οι δύο μοιράζονται: ίδιο 2-λεπτο online threshold, ίδιο
-      "εξαίρεσε τον εαυτό σου" identity filtering (user+computer, όχι
-      μόνο hostname), ίδιο manifest-merge pattern (ένα `rclone copy` όλων
-      των heartbeat αρχείων τοπικά, μετά τοπικό JSON merge — όχι
-      `lsjson`+per-file fetch).
+`SUM(tbl_invoice_items.value)` vs `tbl_invoices.net_amount` για τα τιμολόγια
+που αγγίζουν την κατηγορία `Λάδια/Λιπαντικά`.
 
-      **Προαπαιτούμενο:** το invoicebook δεν έχει καθόλου cloud
-      backup/sync υποδομή ακόμα (δεν υπάρχει rclone/MEGA integration,
-      βλ. `CLAUDE.md` — δεν αναφέρεται πουθενά). Πρέπει πρώτα να προστεθεί
-      το βασικό cloud-sync module (κατά το πρότυπο lab-galatista/expvault)
-      πριν μπει το heartbeat/presence πάνω του.
+- [ ] **1-100€ bucket, διαφορά <9€** (~42 τιμολόγια): αδούλευτο. Ποσοστό
+      πραγματικού bug έχει πέσει από 40% (14-19€ εύρος) σε 25% (9-14€ εύρος)
+      όσο μικραίνει η διαφορά, αλλά ακόμα βρίσκονται λάθη.
+- [ ] **262 (ΤΔΑ-Α-43538)**: σελίδα 1 της σάρωσης πολύ θολή/λοξή, ~8 γραμμές
+      αδύνατο να διαβαστούν. Χρήστης είπε να προσπεραστεί.
+- [ ] **251 (ΤΔΑ-Α-41332)**: 4η γραμμή δυσανάγνωστη (~330€ αναντιστοιχία).
+      Χρήστης είπε να προσπεραστεί.
+- [ ] **247/ΤΔΑ-Α-39474**: 357,50€ αδιάθετο, σάρωση πολύ θολή, χρήστης
+      αρνήθηκε να δώσει αριθμούς.
+- [ ] Άλλες κατηγορίες (καύσιμα, επισκευές κ.λπ.) **ποτέ δεν ελέγχθηκαν** για
+      το ίδιο είδος bug (missing lines, λάθος ποσότητες, λάθος doc_number →
+      λάθος header).
+
+## [invoicebook] Duplicate ΠΑΠΑΝΤΩΝΙΟΥ 813,61€ — απόφαση παρμένη, εκτέλεση σε αναμονή
+
+`tbl_invoices` id 264 (2017-10-09, πραγματικό) vs id 265 (2017-09-15,
+διπλότυπο προς διαγραφή). Ημερομηνία επιβεβαιωμένη από τον χρήστη +
+ανεξάρτητα επιβεβαιωμένη μέσω running-balance cross-check στο τιμολόγιο 266.
+**Δεν έχει γίνει το delete** — χρειάζεται ρητό "πάμε" σε μελλοντική
+συνεδρία. Όταν εκτελεστεί: `DELETE FROM tbl_invoices WHERE id=265`
+(cascades μέσω `ON DELETE CASCADE`) + διαγραφή του
+`pdf_store\2017.09.15 ΠΑΠΑΝΤΩΝΙΟΥ Α.Β.Ε.Ε..pdf`.
+
+## [invoicebook] Presence detection (MEGA/rclone)
+
+Μεταφέρθηκε αυτούσιο από το προηγούμενο `invoices/TODO.md` — δες εκεί το
+πλήρες ιστορικό/σχέδιο (δύο reference υλοποιήσεις: `expvault`,
+`lab-galatista`). Προαπαιτούμενο: invoicebook δεν έχει καθόλου cloud
+backup/sync υποδομή ακόμα.
+
+## [invoicebook] Layer 1 dedup (file-level) δεν έχει χτιστεί
+
+Το "αυτό το ακριβές PDF έχει ήδη εισαχθεί" δεν ελέγχεται πουθενά — ούτε στο
+`pair_pdfs_by_date.py` ούτε στην εφαρμογή. (Layer 2 — semantic dedup μέσω
+doc_number+doc_date+supplier — υπάρχει ήδη και δουλεύει, `_find_duplicate()`
+στο `database.py`.)
+
+## [invoicebook] Retroactive bulk/machine tagging — ρητά αναβλήθηκε
+
+159 migrated τιμολόγια καυσίμων χωρίς `bulk` flag/machine assignment. Δεν
+προχωράει τώρα — μόνο αν αποδειχθεί ότι χρειάζεται.
+
+## [report-tool] "Μέση τιμή ανά τύπο προϊόντος" dashboard — παγωμένο
+
+Σχεδιασμός έτοιμος (κατηγορίες προϊόντων Λάδια/Λιπαντικά, προσέγγιση
+tagging με literal `[TAG]` prefix στο `description` αντί για query-time
+regex). Τίποτα δεν έχει χτιστεί ακόμα. Όταν συνεχιστεί:
+1. Επιβεβαίωση τελικής λίστας κατηγοριών.
+2. Ποια χρόνια καλύπτει το "τελευταία χρόνια" (δεν έχει διευκρινιστεί).
+3. Σχεδιασμός query/UI στο report-tool.
+
+## [intake-tool] Περιήγηση & Διόρθωση δεν κλιμακώνει
+
+Rendering όλων των γραμμών χωρίς pagination. Δύο επιλογές στο τραπέζι (light
+cap+"load more" vs πλήρες sidebar redesign) — δεν έχει επιλεγεί καμία.
+
+## [Cross-repo] 3 ξεχωριστά Electron windows
+
+intake-tool / invoicebook / report-tool είναι 3 πλήρεις ανεξάρτητες
+εφαρμογές. Θέληση να ενοποιηθούν σε λιγότερα παράθυρα — καμία δουλειά δεν
+έχει ξεκινήσει, αρχιτεκτονική αλλαγή, χρειάζεται re-confirm scope πριν
+ξεκινήσει.
