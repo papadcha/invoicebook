@@ -95,6 +95,14 @@ CREATE TABLE tbl_import_staging (
   created_at TEXT NOT NULL
 );
 
+-- Χειροκίνητη επιθεώρηση flagged τιμολογίων ("το είδα, το αφήνω όπως είναι") — βλ.
+-- migration_003_invoice_reviews.sql για το σκεπτικό.
+CREATE TABLE tbl_invoice_reviews (
+  invoice_id INTEGER PRIMARY KEY REFERENCES tbl_invoices(id) ON DELETE CASCADE,
+  note TEXT,
+  reviewed_at TEXT NOT NULL
+);
+
 CREATE TABLE tbl_schema_version (
   version INTEGER NOT NULL,
   applied_at TEXT NOT NULL,

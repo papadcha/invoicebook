@@ -19,11 +19,12 @@ _local_db_dir = os.path.dirname(os.path.abspath(__file__ + '/../database'))
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database', 'schema.sql')
 MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database')
 
-CURRENT_SCHEMA_VERSION = 2
+CURRENT_SCHEMA_VERSION = 3
 
 migration_files = {
     1: os.path.join(MIGRATIONS_DIR, 'migration_001_initial_schema.sql'),
     2: os.path.join(MIGRATIONS_DIR, 'migration_002_generalize_invoices.sql'),
+    3: os.path.join(MIGRATIONS_DIR, 'migration_003_invoice_reviews.sql'),
 }
 
 
@@ -713,6 +714,28 @@ def get_summary(year=None, month=None):
 
 # ── ΕΛΕΓΧΟΣ ΠΟΙΟΤΗΤΑΣ / STATUS ──────────────────────────────────────────────
 
+def add_invoice_review(invoice_id, note=None):
+    """Χειροκίνητη επιθεώρηση: ο χρήστης είδε αυτό το flagged τιμολόγιο και το
+    αφήνει όπως είναι εν γνώσει του — get_flagged_invoices() θα το δείχνει πλέον
+    ως severity='reviewed' ανεξάρτητα τι λέει η αυτόματη ταξινόμηση, μέχρι να
+    αναιρεθεί ρητά (remove_invoice_review). Ξεχωριστό από τους αυτόματους
+    κανόνες, ώστε μια μελλοντική αλλαγή στο heuristic να μην ξαναχάνει την
+    ανθρώπινη απόφαση."""
+    with get_db() as conn:
+        conn.execute('''
+            INSERT INTO tbl_invoice_reviews (invoice_id, note, reviewed_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(invoice_id) DO UPDATE SET note=excluded.note, reviewed_at=excluded.reviewed_at
+        ''', (invoice_id, note, _now()))
+    return {'ok': True}
+
+
+def remove_invoice_review(invoice_id):
+    with get_db() as conn:
+        conn.execute('DELETE FROM tbl_invoice_reviews WHERE invoice_id=?', (invoice_id,))
+    return {'ok': True}
+
+
 def get_flagged_invoices():
     """Τιμολόγια με πιθανά προβλήματα δεδομένων, ένα πέρασμα πάνω σε όλα τα
     τιμολόγια — μικρό dataset σε αυτή την κλίμακα, δεν χρειάζεται caching.
@@ -730,7 +753,12 @@ def get_flagged_invoices():
       net_amount συνολικά — price-less delivery note, αναμενόμενο), ή
       καμία γραμμή με value καθόλου (πιθανή σκόπιμη συνοπτική καταχώρηση
       παλιού migration αντί για πραγματικό λάθος — δεν αξίζει το "σοβαρό"
-      μιας πραγματικής αριθμητικής αναντιστοιχίας)."""
+      μιας πραγματικής αριθμητικής αναντιστοιχίας).
+    - reviewed: ό,τι κι αν θα έλεγε η αυτόματη ταξινόμηση παραπάνω, αν υπάρχει
+      εγγραφή στο tbl_invoice_reviews (add_invoice_review) το τιμολόγιο
+      εμφανίζεται πάντα ως "reviewed" — ρητή ανθρώπινη επιβεβαίωση ότι το
+      είδε κάποιος και το αφήνει όπως είναι, δεν σιωπά τη σημαία, απλά
+      αλλάζει κατηγορία σοβαρότητας."""
     with get_db() as conn:
         invoices = conn.execute('''
             SELECT i.id, i.doc_number, i.doc_date, i.net_amount, s.name as supplier_name
@@ -754,6 +782,11 @@ def get_flagged_invoices():
             'SELECT invoice_id, description, quantity, value FROM tbl_invoice_items'
         ).fetchall():
             items_by_invoice.setdefault(it['invoice_id'], []).append(it)
+
+        reviews = {
+            r['invoice_id']: r for r in
+            conn.execute('SELECT invoice_id, note, reviewed_at FROM tbl_invoice_reviews').fetchall()
+        }
 
     flagged = []
     for inv in invoices:
@@ -804,6 +837,10 @@ def get_flagged_invoices():
                     reason = 'Γραμμή με ποσότητα χωρίς τιμή'
 
         if severity:
+            review = reviews.get(inv_id)
+            if review:
+                reason = f'Επιθεωρήθηκε — {reason}' + (f' ({review["note"]})' if review['note'] else '')
+                severity = 'reviewed'
             flagged.append({
                 'invoice_id': inv_id,
                 'doc_number': inv['doc_number'],
@@ -812,6 +849,7 @@ def get_flagged_invoices():
                 'net_amount': net_amount,
                 'severity': severity,
                 'reason': reason,
+                'reviewed_at': review['reviewed_at'] if review else None,
             })
     return flagged
 
@@ -832,4 +870,5 @@ def get_invoice_status_summary():
         'flagged_severe': sum(1 for f in flagged if f['severity'] == 'severe'),
         'flagged_moderate': sum(1 for f in flagged if f['severity'] == 'moderate'),
         'flagged_duplicate': sum(1 for f in flagged if f['severity'] == 'duplicate'),
+        'flagged_reviewed': sum(1 for f in flagged if f['severity'] == 'reviewed'),
     }
