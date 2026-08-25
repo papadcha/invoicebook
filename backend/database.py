@@ -727,7 +727,10 @@ def get_flagged_invoices():
     - μέτριο: μικρότερη αναντιστοιχία εντός του παραπάνω ορίου (πιθανό
       ΕΞΟΔΑ, μη επιβεβαιωμένο), ή γραμμή με ποσότητα αλλά χωρίς τιμή που δεν
       είναι γνωστή νόμιμη εξαίρεση (ΠΕΡΙΒ.ΕΙΣΦΟΡΑ, ή τιμολόγιο χωρίς
-      net_amount συνολικά — price-less delivery note, αναμενόμενο)."""
+      net_amount συνολικά — price-less delivery note, αναμενόμενο), ή
+      καμία γραμμή με value καθόλου (πιθανή σκόπιμη συνοπτική καταχώρηση
+      παλιού migration αντί για πραγματικό λάθος — δεν αξίζει το "σοβαρό"
+      μιας πραγματικής αριθμητικής αναντιστοιχίας)."""
     with get_db() as conn:
         invoices = conn.execute('''
             SELECT i.id, i.doc_number, i.doc_date, i.net_amount, s.name as supplier_name
@@ -767,6 +770,12 @@ def get_flagged_invoices():
             has_unknown_line = any(
                 it['description'] and '[ΑΓΝΩΣΤΟ' in it['description'] for it in items
             )
+            # Καμία γραμμή με value καθόλου (όχι απλά αναντιστοιχία, ΜΗΔΕΝΙΚΗ ανάλυση) —
+            # συνήθως σκόπιμη συνοπτική καταχώρηση παλιού migration (π.χ. τιμολόγιο 33,
+            # ΜΑΚΡΟ 0008-007020: 22 πραγματικές γραμμές συμπυκνωμένες σε μία περιγραφή
+            # χωρίς ποσά, ενώ η κεφαλίδα είναι σωστή) — να ΜΗΝ βαρύνει σαν "σοβαρό" όπως
+            # μια πραγματική αναντιστοιχία αριθμών, βλ. user 2026-08-25.
+            no_value_at_all = bool(items) and all(it['value'] is None for it in items)
             diff = None
             if net_amount is not None:
                 item_sum = sum(it['value'] for it in items if it['value'] is not None)
@@ -775,6 +784,9 @@ def get_flagged_invoices():
             if has_unknown_line:
                 severity = 'severe'
                 reason = 'Δυσανάγνωστη/άγνωστη γραμμή'
+            elif no_value_at_all and net_amount:
+                severity = 'moderate'
+                reason = 'Χωρίς αναλυτικές γραμμές αξίας (πιθανή σκόπιμη συνοπτική καταχώρηση, όχι απαραίτητα λάθος)'
             elif diff is not None and diff > max(20.0, 0.05 * net_amount):
                 severity = 'severe'
                 reason = f'Αναντιστοιχία {diff:.2f}€ (γραμμές έναντι net_amount)'
