@@ -776,14 +776,21 @@ def get_flagged_invoices():
       μοτίβο για δυσανάγνωστες σαρώσεις), ή SUM(items.value) αποκλίνει από
       το net_amount πέρα από ό,τι θα μπορούσε να εξηγηθεί ως ΕΞΟΔΑ/μεταφορικά
       (>20€ ή >5% του net_amount — το ΕΞΟΔΑ δεν είναι δικό του πεδίο στη
-      βάση, μόνο στο τυπωμένο χαρτί, οπότε αυτό είναι ευριστικό όριο).
+      βάση, μόνο στο τυπωμένο χαρτί, οπότε αυτό είναι ευριστικό όριο), ή
+      net_amount+vat_amount αποκλίνει από το total_amount πέρα από το ίδιο
+      όριο (ίδια λογική αναντιστοιχίας, άλλο ζευγάρι πεδίων — βλ. bug
+      2026-08-27, τιμολόγια όπου το σύνολο στο χαρτί περιλάμβανε κάτι που
+      δεν μπήκε ως ξεχωριστή γραμμή), ή γραμμή με vat_pct=24 σε τιμολόγιο
+      πριν την 1/6/2016 (ο συντελεστής ΦΠΑ 24% δεν υπήρχε πριν αυτή την
+      ημερομηνία στην Ελλάδα — σχεδόν σίγουρα λάθος ανάγνωση του 23%).
     - μέτριο: μικρότερη αναντιστοιχία εντός του παραπάνω ορίου (πιθανό
-      ΕΞΟΔΑ, μη επιβεβαιωμένο), ή γραμμή με ποσότητα αλλά χωρίς τιμή που δεν
-      είναι γνωστή νόμιμη εξαίρεση (ΠΕΡΙΒ.ΕΙΣΦΟΡΑ, ή τιμολόγιο χωρίς
-      net_amount συνολικά — price-less delivery note, αναμενόμενο), ή
-      καμία γραμμή με value καθόλου (πιθανή σκόπιμη συνοπτική καταχώρηση
-      παλιού migration αντί για πραγματικό λάθος — δεν αξίζει το "σοβαρό"
-      μιας πραγματικής αριθμητικής αναντιστοιχίας).
+      ΕΞΟΔΑ, μη επιβεβαιωμένο) σε οποιοδήποτε από τα δύο ζεύγη πεδίων
+      παραπάνω, ή γραμμή με ποσότητα αλλά χωρίς τιμή που δεν είναι γνωστή
+      νόμιμη εξαίρεση (ΠΕΡΙΒ.ΕΙΣΦΟΡΑ, ή τιμολόγιο χωρίς net_amount συνολικά
+      — price-less delivery note, αναμενόμενο), ή καμία γραμμή με value
+      καθόλου (πιθανή σκόπιμη συνοπτική καταχώρηση παλιού migration αντί
+      για πραγματικό λάθος — δεν αξίζει το "σοβαρό" μιας πραγματικής
+      αριθμητικής αναντιστοιχίας).
     - reviewed: ό,τι κι αν θα έλεγε η αυτόματη ταξινόμηση παραπάνω, αν υπάρχει
       εγγραφή στο tbl_invoice_reviews (add_invoice_review) το τιμολόγιο
       εμφανίζεται πάντα ως "reviewed" — ρητή ανθρώπινη επιβεβαίωση ότι το
@@ -791,7 +798,8 @@ def get_flagged_invoices():
       αλλάζει κατηγορία σοβαρότητας."""
     with get_db() as conn:
         invoices = conn.execute('''
-            SELECT i.id, i.doc_number, i.doc_date, i.net_amount, s.name as supplier_name
+            SELECT i.id, i.doc_number, i.doc_date, i.net_amount, i.vat_amount,
+                   i.total_amount, s.name as supplier_name
             FROM tbl_invoices i
             LEFT JOIN tbl_suppliers s ON s.id = i.supplier_id
         ''').fetchall()
@@ -809,7 +817,7 @@ def get_flagged_invoices():
 
         items_by_invoice = {}
         for it in conn.execute(
-            'SELECT invoice_id, description, quantity, value FROM tbl_invoice_items'
+            'SELECT invoice_id, description, quantity, value, vat_pct FROM tbl_invoice_items'
         ).fetchall():
             items_by_invoice.setdefault(it['invoice_id'], []).append(it)
 
@@ -844,18 +852,41 @@ def get_flagged_invoices():
                 item_sum = sum(it['value'] for it in items if it['value'] is not None)
                 diff = abs(item_sum - net_amount)
 
+            # Ίδια λογική με diff (items vs net_amount) παραπάνω, άλλο ζεύγος πεδίων:
+            # ό,τι δηλώνει το ίδιο το τιμολόγιο (net+ΦΠΑ) έναντι του καταχωρημένου
+            # συνόλου του.
+            total_diff = None
+            if net_amount is not None and inv['vat_amount'] is not None and inv['total_amount'] is not None:
+                total_diff = abs((net_amount + inv['vat_amount']) - inv['total_amount'])
+
+            # 24% ΦΠΑ δεν υπήρχε στην Ελλάδα πριν την 1/6/2016 (ήταν 23%) — σχεδόν
+            # σίγουρα λάθος ανάγνωση, βλ. bug 2026-08-27.
+            impossible_vat_rate = bool(
+                inv['doc_date'] and inv['doc_date'] < '2016-06-01' and
+                any(it['vat_pct'] == 24 for it in items)
+            )
+
             if has_unknown_line:
                 severity = 'severe'
                 reason = 'Δυσανάγνωστη/άγνωστη γραμμή'
+            elif impossible_vat_rate:
+                severity = 'severe'
+                reason = 'Γραμμή με ΦΠΑ 24% σε τιμολόγιο πριν την 1/6/2016 (δεν υπήρχε αυτός ο συντελεστής τότε — πιθανό λάθος ανάγνωσης του 23%)'
             elif no_value_at_all and net_amount:
                 severity = 'moderate'
                 reason = 'Χωρίς αναλυτικές γραμμές αξίας (πιθανή σκόπιμη συνοπτική καταχώρηση, όχι απαραίτητα λάθος)'
             elif diff is not None and diff > max(20.0, 0.05 * net_amount):
                 severity = 'severe'
                 reason = f'Αναντιστοιχία {diff:.2f}€ (γραμμές έναντι net_amount)'
+            elif total_diff is not None and total_diff > max(20.0, 0.05 * net_amount):
+                severity = 'severe'
+                reason = f'Αναντιστοιχία {total_diff:.2f}€ (net+ΦΠΑ έναντι καταχωρημένου συνόλου)'
             elif diff is not None and diff > 0.01:
                 severity = 'moderate'
                 reason = f'Μικρή αναντιστοιχία {diff:.2f}€ (πιθανό ΕΞΟΔΑ, μη επιβεβαιωμένο)'
+            elif total_diff is not None and total_diff > 0.01:
+                severity = 'moderate'
+                reason = f'Μικρή αναντιστοιχία {total_diff:.2f}€ (net+ΦΠΑ έναντι συνόλου, μη επιβεβαιωμένο)'
             elif net_amount is not None:
                 missing_value_line = any(
                     it['quantity'] is not None and it['value'] is None and
