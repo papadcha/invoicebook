@@ -7,6 +7,7 @@ DB_NAME ορίζεται δυναμικά από το bridge.py πριν κλη�
 import sqlite3
 import os
 import re
+import sys
 import json
 import shutil
 from contextlib import contextmanager
@@ -413,7 +414,11 @@ def get_invoice_items_by_category(category=None, date_from=None, date_to=None):
     επίπεδο γραμμής (ένα τιμολόγιο μπορεί να συνεισφέρει 0, 1 ή πολλές γραμμές
     στην ίδια κατηγορία). Χρησιμοποιείται από τα tabs Καύσιμα/Επισκευές/... του
     intake-tool για αναζήτηση/περιήγηση/διόρθωση ανά κατηγορία. category=None
-    (ή κενό) = καμία στήλωση κατηγορίας — "Όλες" στο UI."""
+    (ή κενό) = καμία στήλωση κατηγορίας — "Όλες" στο UI.
+    LEFT JOIN (όχι JOIN) στα items: ένα confirmed τιμολόγιο μπορεί νόμιμα να
+    έχει 0 γραμμές (π.χ. staging χωρίς αναγνώσιμο περιεχόμενο, βλ. #9870
+    2026-08-26) — με INNER JOIN ένα τέτοιο τιμολόγιο ήταν μόνιμα αόρατο σε
+    αυτή τη λίστα παρόλο που υπήρχε κανονικά στη βάση."""
     with get_db() as conn:
         q = '''SELECT it.id as item_id, it.code, it.description, it.unit, it.quantity,
                       it.unit_price, it.value, it.vat_pct, it.category, it.machine_id,
@@ -423,8 +428,8 @@ def get_invoice_items_by_category(category=None, date_from=None, date_to=None):
                       i.customer_phone, i.net_amount, i.vat_amount, i.total_amount,
                       i.payment_method, i.notes, i.source_pdf_filename,
                       s.name as supplier_name, s.vat_number as supplier_vat
-               FROM tbl_invoice_items it
-               JOIN tbl_invoices i ON i.id = it.invoice_id
+               FROM tbl_invoices i
+               LEFT JOIN tbl_invoice_items it ON it.invoice_id = i.id
                LEFT JOIN tbl_suppliers s ON s.id = i.supplier_id
                LEFT JOIN tbl_machines m ON m.id = it.machine_id
                WHERE 1=1'''
@@ -584,6 +589,14 @@ def get_staging_batch(batch_label=None, status=None):
 
 
 def confirm_staging_row(staging_id):
+    """Καλεί ΚΑΙ το attach_pdf αυτόματα αν το staged JSON έχει source_pdf_path — δεν
+    βασιζόμαστε πια αποκλειστικά στο front-end (js/import.js) για αυτό, γιατί οτιδήποτε
+    κάνει confirm απευθείας μέσω αυτής της συνάρτησης (π.χ. ένα batch-import script πάνω
+    στο bridge, χωρίς να περνάει από το Electron UI) παρέκαμπτε σιωπηλά το attach —
+    επαναλαμβανόμενο πρόβλημα, βλ. intake-tool's audit-checkpoint memory. Το attach
+    τρέχει ΜΕΤΑ το commit (εκτός του with-block) ώστε μια αποτυχία επισύναψης PDF να μην
+    κάνει rollback ένα ήδη επιτυχές confirm — το χειροκίνητο "Επισύναψη" στο UI μένει ως
+    fallback αν αποτύχει."""
     with get_db() as conn:
         row = conn.execute('SELECT * FROM tbl_import_staging WHERE id=?', (staging_id,)).fetchone()
         if not row:
@@ -604,7 +617,16 @@ def confirm_staging_row(staging_id):
                 _create_bulk_pool(conn, item_row['id'], orig_item)
 
         conn.execute("UPDATE tbl_import_staging SET status='confirmed' WHERE id=?", (staging_id,))
-        return invoice_id
+
+    source_pdf_path = data.get('source_pdf_path')
+    if source_pdf_path and os.path.exists(source_pdf_path):
+        try:
+            attach_pdf(invoice_id, source_pdf_path)
+        except Exception as e:
+            print(f'confirm_staging_row: αποτυχία αυτόματης επισύναψης PDF για invoice '
+                  f'{invoice_id} ({source_pdf_path}): {e}', file=sys.stderr)
+
+    return invoice_id
 
 
 def reject_staging_row(staging_id):
