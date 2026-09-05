@@ -48,11 +48,6 @@ regex). Τίποτα δεν έχει χτιστεί ακόμα. Όταν συν�
 2. Ποια χρόνια καλύπτει το "τελευταία χρόνια" (δεν έχει διευκρινιστεί).
 3. Σχεδιασμός query/UI στο report-tool.
 
-## [intake-tool] Περιήγηση & Διόρθωση δεν κλιμακώνει
-
-Rendering όλων των γραμμών χωρίς pagination. Δύο επιλογές στο τραπέζι (light
-cap+"load more" vs πλήρες sidebar redesign) — δεν έχει επιλεγεί καμία.
-
 ## [Cross-repo] 3 ξεχωριστά Electron windows
 
 intake-tool / invoicebook / report-tool είναι 3 πλήρεις ανεξάρτητες
