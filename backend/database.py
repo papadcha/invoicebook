@@ -743,6 +743,30 @@ def close_bulk_pool(pool_id, note=None):
         )
 
 
+def delete_bulk_pool(pool_id):
+    """Αναιρεί εντελώς τη σήμανση bulk μιας γραμμής — διαφορετικό από
+    close_bulk_pool: εκεί (κλείσιμο) μένει ιστορικό "ήταν bulk, τελείωσε/
+    ακυρώθηκε", εδώ διαγράφεται η ίδια η bulk-ότητα σαν να μην είχε ποτέ
+    σημανθεί (π.χ. λάθος τσεκάρισμα bulk στο confirm μιας μεμονωμένης
+    αγοράς). Επιτρέπεται μόνο αν δεν έχει γίνει ΚΑΜΙΑ κατανομή ποτέ —
+    διαφορετικά υπάρχει πραγματικό ιστορικό κατανάλωσης που χάνεται σιωπηλά
+    (ίδιος κίνδυνος με delete_invoice/delete_invoice_item)."""
+    with get_db() as conn:
+        pool = conn.execute('SELECT * FROM tbl_bulk_pools WHERE id=?', (pool_id,)).fetchone()
+        if not pool:
+            raise ValueError('Το απόθεμα δεν βρέθηκε')
+        alloc_count = conn.execute(
+            'SELECT COUNT(*) FROM tbl_allocations WHERE pool_id=?', (pool_id,)
+        ).fetchone()[0]
+        if alloc_count:
+            raise ValueError(
+                f'Δεν αναιρείται — υπάρχουν {alloc_count} καταχωρημένοι διαμοιρασμοί σε '
+                f'μηχανήματα πάνω σε αυτό το απόθεμα. Αν πραγματικά χρειάζεται αναίρεση, '
+                f'σβήσε πρώτα τους διαμοιρασμούς.'
+            )
+        conn.execute('DELETE FROM tbl_bulk_pools WHERE id=?', (pool_id,))
+
+
 # ── ΑΝΑΦΟΡΕΣ ──────────────────────────────────────────────────────────────────
 
 def get_summary(year=None, month=None):
