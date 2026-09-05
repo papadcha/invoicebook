@@ -23,16 +23,6 @@
       το ίδιο είδος bug (missing lines, λάθος ποσότητες, λάθος doc_number →
       λάθος header).
 
-## [invoicebook] Duplicate ΠΑΠΑΝΤΩΝΙΟΥ 813,61€ — απόφαση παρμένη, εκτέλεση σε αναμονή
-
-`tbl_invoices` id 264 (2017-10-09, πραγματικό) vs id 265 (2017-09-15,
-διπλότυπο προς διαγραφή). Ημερομηνία επιβεβαιωμένη από τον χρήστη +
-ανεξάρτητα επιβεβαιωμένη μέσω running-balance cross-check στο τιμολόγιο 266.
-**Δεν έχει γίνει το delete** — χρειάζεται ρητό "πάμε" σε μελλοντική
-συνεδρία. Όταν εκτελεστεί: `DELETE FROM tbl_invoices WHERE id=265`
-(cascades μέσω `ON DELETE CASCADE`) + διαγραφή του
-`pdf_store\2017.09.15 ΠΑΠΑΝΤΩΝΙΟΥ Α.Β.Ε.Ε..pdf`.
-
 ## [invoicebook] Presence detection (MEGA/rclone)
 
 Μεταφέρθηκε αυτούσιο από το προηγούμενο `invoices/TODO.md` — δες εκεί το
