@@ -1,2 +1,4 @@
-# InvoiceBook backend — v1 χρησιμοποιεί μόνο την Python standard library
-# (sqlite3, json, csv). Δεν χρειάζονται εξωτερικά πακέτα προς το παρόν.
+# InvoiceBook backend — v1 χρησιμοποιούσε μόνο την Python standard library.
+# pypdf προστέθηκε (2026-09-07) για το merge_documents()/_merge_pdfs_and_attach()
+# στο database.py -- ένωση πολυσέλιδων παραστατικών (intake-tool feature).
+pypdf>=6.0

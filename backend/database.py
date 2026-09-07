@@ -669,6 +669,144 @@ def update_invoice_from_data(invoice_id, data):
     return invoice_id
 
 
+# ── ΕΝΩΣΗ ΠΟΛΥΣΕΛΙΔΩΝ ΠΑΡΑΣΤΑΤΙΚΩΝ ────────────────────────────────────────────
+# Ένα φυσικό πολυσέλιδο έγγραφο μπορεί να καταλήξει σε πάνω από μία staging
+# γραμμή (κάθε σελίδα φωτογραφήθηκε/υποβλήθηκε ξεχωριστά) ή σε ένα ήδη
+# confirmed τιμολόγιο (μία σελίδα) + μία ή περισσότερες staging γραμμές (οι
+# υπόλοιπες σελίδες) — βλ. intake-tool's DONE.md, 2026-09-07 (DIDIS 284,
+# ΚΑΥΚΑΣ 0050928). Οι δύο πραγματικές περιπτώσεις διέφεραν στο αν οι πηγές
+# είχαν συμπληρωματικά (disjoint) ή επικαλυπτόμενα items — το UI αφήνει τον
+# χειριστή να διαλέξει με checkbox το τελικό σύνολο γραμμών, οπότε εδώ είναι
+# πάντα "πλήρης αντικατάσταση" (μέσω update_invoice με items χωρίς 'id'), ποτέ
+# append· έτσι δεν χρειάζεται να ξεχωρίζουμε τις δύο περιπτώσεις στον κώδικα.
+
+def find_duplicate_invoice(header):
+    """Read-only έλεγχος αν υπάρχει ήδη confirmed τιμολόγιο με ίδιο
+    (doc_number, doc_date, προμηθευτή) — ίδιο κριτήριο με το _find_duplicate
+    που ήδη μπλοκάρει το confirm_staging_row, αλλά καλέσιμο ΠΡΙΝ την
+    προσπάθεια confirm (το UI το καλεί when-clicked σε ΕΝΑ staging row, όχι
+    eager για όλη τη λίστα — βλ. σχεδιασμό στο πλάνο). Δεν δημιουργεί ποτέ
+    προμηθευτή αν δεν βρεθεί (σε αντίθεση με _find_or_create_supplier) — αν ο
+    προμηθευτής δεν υπάρχει καν, σίγουρα δεν υπάρχει διπλότυπο."""
+    doc_number = header.get('doc_number')
+    doc_date = header.get('doc_date')
+    if not doc_number or not doc_date:
+        return None
+    with get_db() as conn:
+        supplier_id = None
+        norm_vat = _normalize_vat(header.get('supplier_vat'))
+        if norm_vat:
+            for r in conn.execute('SELECT id, vat_number FROM tbl_suppliers WHERE vat_number IS NOT NULL'):
+                if _normalize_vat(r['vat_number']) == norm_vat:
+                    supplier_id = r['id']
+                    break
+        if supplier_id is None and header.get('supplier_name'):
+            row = conn.execute(
+                'SELECT id FROM tbl_suppliers WHERE name=?', (header['supplier_name'],)
+            ).fetchone()
+            if row:
+                supplier_id = row['id']
+        if supplier_id is None:
+            return None
+        row = conn.execute(
+            '''SELECT i.id, i.doc_number, i.doc_date, i.total_amount, s.name as supplier_name
+               FROM tbl_invoices i JOIN tbl_suppliers s ON s.id = i.supplier_id
+               WHERE i.doc_number=? AND i.doc_date=? AND i.supplier_id=?''',
+            (doc_number, doc_date, supplier_id)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+CURRENT_PDF_SENTINEL = '__CURRENT_PDF__'  # στη θέση ενός staging row's source_pdf_path μέσα σε
+# pdf_paths_in_order -- σημαίνει "το ήδη-συνδεδεμένο PDF του target τιμολογίου εδώ στη σειρά".
+# Resolved server-side (δεν εκθέτουμε ποτέ το πραγματικό PDF_STORE_DIR path στο frontend).
+
+
+def _merge_pdfs_and_attach(invoice_id, pdf_paths_in_order, old_path=None):
+    """Ενώνει τα PDF στη δοσμένη σειρά (λίστα paths -- πραγματικά staging
+    source_pdf_path, ή/και το CURRENT_PDF_SENTINEL για το τρέχον PDF του
+    invoice) σε ένα πολυσέλιδο αρχείο και το επισυνάπτει μέσω attach_pdf.
+    old_path (το ΤΡΕΧΟΝ pdf_store αρχείο του invoice, PRIN από οποιαδήποτε
+    header/items ενημέρωση) πρέπει να δοθεί από τον caller -- ΔΕΝ μπορεί να
+    ξαναδιαβαστεί εδώ από τη βάση, γιατί το merge_documents καλεί πρώτα
+    update_invoice, που ήδη μηδενίζει το source_pdf_filename στήλη (βλ.
+    update_invoice_from_data's ίδιο-ακριβώς πρόβλημα, λυμένο εκεί με το
+    attach_pdf να τρέχει ΜΕΤΑ). Το ΠΑΛΙΟ αρχείο στο pdf_store διαγράφεται
+    πριν το attach_pdf ώστε να μην προσθέσει "(2)" στο όνομα. Τα πηγαία
+    αρχεία (πλην του ήδη-διαγραμμένου old_path) διαγράφονται μετά την
+    επιτυχή ένωση -- ίδιο pattern με το attach_pdf's "μετακίνηση, όχι
+    αντιγραφή" σκεπτικό."""
+    if not pdf_paths_in_order:
+        return None
+    from pypdf import PdfWriter
+    old_path = os.path.abspath(old_path) if old_path else None
+
+    resolved_paths = [old_path if p == CURRENT_PDF_SENTINEL else p for p in pdf_paths_in_order]
+    if any(p is None for p in resolved_paths):
+        raise ValueError('Δεν υπάρχει τρέχον συνδεδεμένο PDF για ένωση σε αυτό το τιμολόγιο')
+
+    # Διαβάζει (writer.append) ΟΛΕΣ τις πηγές -- old_path included, αν είναι μία απ' αυτές --
+    # πριν διαγραφεί οτιδήποτε, ώστε το merged αρχείο να μη χάσει σελίδες.
+    pdf_paths_in_order = resolved_paths
+    writer = PdfWriter()
+    for p in pdf_paths_in_order:
+        writer.append(p)
+    os.makedirs(PDF_STORE_DIR, exist_ok=True)
+    tmp_path = os.path.join(PDF_STORE_DIR, f'_merge_tmp_{invoice_id}.pdf')
+    with open(tmp_path, 'wb') as f:
+        writer.write(f)
+    writer.close()
+
+    # Τώρα ασφαλές να καθαρίσουμε τα πηγαία αρχεία -- old_path πάντα (ήδη
+    # ενσωματωμένο στο merged αρχείο, αλλιώς θα μπλόκαρε το attach_pdf's
+    # naming με "(2)"), και κάθε άλλη πηγή (staging pages) που δεν είναι το
+    # ήδη-διαγραμμένο old_path.
+    if old_path and os.path.exists(old_path):
+        os.remove(old_path)
+    for p in pdf_paths_in_order:
+        ap = os.path.abspath(p)
+        if ap != old_path and os.path.exists(p):
+            os.remove(p)
+
+    return attach_pdf(invoice_id, tmp_path)
+
+
+def merge_documents(target_invoice_id, staging_ids, header, items, pdf_paths_in_order):
+    """Ενώνει ένα ή περισσότερα staging rows (και προαιρετικά ένα ήδη
+    confirmed τιμολόγιο) σε ΕΝΑ τιμολόγιο — header/items έρχονται ήδη
+    οριστικοποιημένα από τον χειριστή (raw shape, ίδιο με ένα staging JSON).
+    target_invoice_id=None -> δημιουργείται νέο τιμολόγιο (καθαρό staging+
+    staging merge)· δοσμένο -> πλήρης αντικατάσταση των γραμμών του (βλ.
+    update_invoice). Τα staging_ids που καταναλώθηκαν μαρκάρονται 'merged'
+    (όχι 'rejected' — δεν απορρίφθηκαν ως άχρηστα, ενώθηκαν αλλού)."""
+    with get_db() as conn:
+        header_resolved = _resolve_header(conn, header)
+        items_resolved = _resolve_items(conn, items)
+        old_pdf_filename = None
+        if target_invoice_id:
+            row = conn.execute(
+                'SELECT source_pdf_filename FROM tbl_invoices WHERE id=?', (target_invoice_id,)
+            ).fetchone()
+            old_pdf_filename = row['source_pdf_filename'] if row else None
+    old_pdf_path = os.path.join(PDF_STORE_DIR, old_pdf_filename) if old_pdf_filename else None
+
+    if target_invoice_id:
+        update_invoice(target_invoice_id, header_resolved, items_resolved)
+        invoice_id = target_invoice_id
+    else:
+        with get_db() as conn:
+            invoice_id = _insert_invoice(conn, header_resolved, items_resolved)
+
+    if pdf_paths_in_order:
+        _merge_pdfs_and_attach(invoice_id, pdf_paths_in_order, old_path=old_pdf_path)
+
+    with get_db() as conn:
+        for sid in (staging_ids or []):
+            conn.execute("UPDATE tbl_import_staging SET status='merged' WHERE id=?", (sid,))
+
+    return invoice_id
+
+
 # ── ΜΑΖΙΚΕΣ ΚΑΤΑΧΩΡΗΣΕΙΣ / ΔΙΑΜΟΙΡΑΣΜΟΣ (2 στάδια) ────────────────────────────
 # Στάδιο 1: μια bulk καταχώρηση (π.χ. δεξαμενή πετρελαίου) δημιουργεί ένα
 # "απόθεμα προς διαμοιρασμό" με remaining_quantity = όλη η αρχική ποσότητα.
