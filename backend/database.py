@@ -10,6 +10,7 @@ import re
 import sys
 import json
 import shutil
+import unicodedata
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
@@ -471,12 +472,41 @@ def list_machines():
         return [dict(r) for r in rows]
 
 
+# Ελληνικά κεφαλαία γράμματα οπτικά πανομοιότυπα με λατινικά (π.χ. πληκτρολόγιο
+# σε ελληνικά διάταξη κατά την πληκτρολόγηση πινακίδας μηχανήματος) -- χωρίς
+# αυτό, "NHY 7148" (λατινικά) και "ΝΗΥ 7148" (ελληνικά, ίδια εμφάνιση) γίνονται
+# δύο ξεχωριστές εγγραφές στο tbl_machines (βλ. dedup sweep, 111 εγγραφές αντί
+# για τις πραγματικές μηχανές).
+_GREEK_LATIN_HOMOGLYPHS = str.maketrans({
+    'Α': 'A', 'Β': 'B', 'Ε': 'E', 'Ζ': 'Z', 'Η': 'H', 'Ι': 'I', 'Κ': 'K',
+    'Μ': 'M', 'Ν': 'N', 'Ο': 'O', 'Ρ': 'P', 'Τ': 'T', 'Υ': 'Y', 'Χ': 'X',
+})
+
+
+def _normalize_machine_code(name):
+    """Κωδικός μηχανήματος χωρίς μορφοποίηση (κενά/παύλες/παρενθέσεις) και χωρίς
+    διάκριση Ελληνικών/Λατινικών ομοιόμορφων γραμμάτων, ώστε "NHY 7148",
+    "NHY-7148", "NHY7148", "ΝΗΥ 7148", "ΝΗΥ7148" να αναγνωρίζονται ως το ΙΔΙΟ
+    μηχάνημα. Σκόπιμα ΔΕΝ πιάνει γράμματα που απλώς μοιάζουν οπτικά χωρίς να
+    είναι το ίδιο γράμμα σε άλλο αλφάβητο (π.χ. "ΝΠΥ" έναντι "ΝΗΥ" -- πιθανό
+    typo, όχι σίγουρο ταίριασμα) -- αυτά μένουν για το χειροκίνητο dedup sweep."""
+    s = unicodedata.normalize('NFD', name or '')
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+    s = s.upper().translate(_GREEK_LATIN_HOMOGLYPHS)
+    return re.sub(r'[^A-Z0-9Α-Ω]', '', s)
+
+
 def _find_or_create_machine(conn, name):
     if not name:
         return None
     row = conn.execute('SELECT id FROM tbl_machines WHERE name=?', (name,)).fetchone()
     if row:
         return row['id']
+    norm = _normalize_machine_code(name)
+    if norm:
+        for r in conn.execute('SELECT id, name FROM tbl_machines').fetchall():
+            if _normalize_machine_code(r['name']) == norm:
+                return r['id']
     cur = conn.execute('INSERT INTO tbl_machines (name) VALUES (?)', (name,))
     return cur.lastrowid
 
