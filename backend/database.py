@@ -535,6 +535,35 @@ def _resolve_header(conn, data):
     }
 
 
+def _canonicalize_description(conn, category, description):
+    """Ίδια λογική με το _find_or_create_machine (βλ. εκεί) αλλά χωρίς ξεχωριστό
+    πίνακα-λεξικό: αντί για "βρες ή φτιάξε" εδώ είναι μόνο "βρες" -- αν ήδη
+    υπάρχει γραμμή στην ΙΔΙΑ κατηγορία με description που κανονικοποιείται στο
+    ίδιο κλειδί (κενά/παύλες/Ελληνικά-Λατινικά αγνοούνται), επιστρέφει το ήδη
+    καταχωρημένο ΑΚΡΙΒΕΣ κείμενο αντί για το νεοεισερχόμενο -- ώστε δύο
+    μορφοποιητικά διαφορετικές γραφές του ίδιου προϊόντος να μην ξαναδιχάσουν
+    το ίδιο πρόβλημα που είχαμε στα μηχανήματα (βλ. λιπαντικά dedup sweep,
+    2026-09-09: "AGRON UTTO SAE 80W 1X18L" έναντι OCR-αλλοιωμένων "AGRON UTTO
+    BRE 80W 1X18"/"AGRON SUTTO SAB HOW AXIBL"). Αν δεν βρεθεί τίποτα, μένει
+    ΑΝΕΓΓΙΧΤΟ όπως ήρθε -- δεν εφευρίσκουμε νέα μορφή, μόνο ταιριάζουμε με ό,τι
+    ήδη υπάρχει (ίδιο conservative tier-1 σκεπτικό)."""
+    if not description or not category:
+        return description
+    exact = conn.execute(
+        'SELECT 1 FROM tbl_invoice_items WHERE category=? AND description=? LIMIT 1',
+        (category, description)
+    ).fetchone()
+    if exact:
+        return description
+    norm = _normalize_machine_code(description)
+    if not norm:
+        return description
+    for r in conn.execute('SELECT DISTINCT description FROM tbl_invoice_items WHERE category=?', (category,)).fetchall():
+        if _normalize_machine_code(r['description']) == norm:
+            return r['description']
+    return description
+
+
 def _resolve_items(conn, items):
     """machine_id λύνεται από machine_name ΜΟΝΟ όταν το κλειδί υπάρχει (ρητά
     δοσμένο από τον χειριστή/staging JSON) — αλλιώς μένει ό,τι ήδη έχει το item
@@ -547,6 +576,8 @@ def _resolve_items(conn, items):
         r = dict(it)
         if 'machine_name' in r:
             r['machine_id'] = _find_or_create_machine(conn, r.get('machine_name'))
+        if r.get('description') and r.get('category'):
+            r['description'] = _canonicalize_description(conn, r['category'], r['description'])
         resolved.append(r)
     return resolved
 
