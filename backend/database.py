@@ -874,12 +874,23 @@ def confirm_staging_row(staging_id):
         conn.execute("UPDATE tbl_import_staging SET status='confirmed' WHERE id=?", (staging_id,))
 
     source_pdf_path = data.get('source_pdf_path')
-    if source_pdf_path and os.path.exists(source_pdf_path):
+    if source_pdf_path:
+        # source_pdf_path: string (1 σελίδα, ιστορικό σχήμα) ή λίστα από strings σε
+        # σειρά σελίδων (πολλές φωτογραφίες/σαρώσεις του ίδιου παραστατικού
+        # συνδυάστηκαν σε ένα AI call, βλ. TODO.md) -- και στις δύο περιπτώσεις πρέπει
+        # να καταλήξει ΕΝΑ attached PDF στο pdf_store.
+        paths = source_pdf_path if isinstance(source_pdf_path, list) else [source_pdf_path]
+        paths = [p for p in paths if p and os.path.exists(p)]
         try:
-            attach_pdf(invoice_id, source_pdf_path)
+            if len(paths) == 1:
+                attach_pdf(invoice_id, paths[0])
+            elif len(paths) > 1:
+                # Ίδια μηχανή με το "Εργαλείο ένωσης πολυσέλιδων παραστατικών" -- συγχωνεύει
+                # τα N PDF σε ένα πολυσέλιδο πριν το attach, καμία ξεχωριστή λογική εδώ.
+                _merge_pdfs_and_attach(invoice_id, paths)
         except Exception as e:
             print(f'confirm_staging_row: αποτυχία αυτόματης επισύναψης PDF για invoice '
-                  f'{invoice_id} ({source_pdf_path}): {e}', file=sys.stderr)
+                  f'{invoice_id} ({paths}): {e}', file=sys.stderr)
 
     return invoice_id
 
