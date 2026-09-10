@@ -3,6 +3,35 @@
 Ό,τι έχει ολοκληρωθεί από τη λίστα εργασιών του project Γαλάτιστας. Βλ.
 `TODO.md` για ό,τι μένει. Ίδιο αρχείο και στα 3 repos.
 
+## [invoicebook/intake-tool] In-app εργαλείο συγχώνευσης μηχανημάτων (2026-09-10)
+
+Τρίτο κομμάτι της ίδιας οικογένειας εργαλείων (suppliers, description, τώρα machines)
+στο tab «🧹 Καθαρισμός». Sweep 182→75 στις 2026-09-06 ήταν πάντα χειροκίνητο raw SQL —
+τώρα υπάρχει πραγματικό εργαλείο.
+
+- **`invoicebook` `backend/database.py`**: `get_machine_merge_candidates()`,
+  `get_machine_merge_preview()`, `merge_machines(keep_id, merge_id)` — μέσα στο ήδη
+  υπάρχον ΜΗΧΑΝΗΜΑΤΑ section, reuse του ήδη υπάρχοντος `_normalize_machine_code`.
+  **Σημαντική διαφορά από suppliers**: το `tbl_machines` δεν έχει δεύτερη ταυτοποίηση
+  σαν ΑΦΜ — άρα κανένα STRONG tier δεν είναι δυνατό, μόνο exact-normalized-match
+  (ίδιο tier με το description tool). Επιβεβαιώθηκε στην πράξη πάνω σε throwaway
+  αντίγραφο: 0 αυτόματα candidates σε 89 ήδη-καθαρισμένα μηχανήματα — το χειροκίνητο
+  merge-by-id είναι ο κύριος τρόπος χρήσης, όχι εφεδρικός, ρητά αναφερόμενο στο UI.
+  `merge_machines` ξαναδείχνει ΔΥΟ FK, όχι ένα — `tbl_invoice_items.machine_id` ΚΑΙ
+  `tbl_allocations.machine_id` (bulk-pool διαμοιρασμός 2ου σταδίου, εύκολο να ξεχαστεί).
+- **`intake-tool`**: 3η κάρτα "Μηχανήματα — Υποψήφια προς Συγχώνευση" στο Καθαρισμός
+  tab, ίδιο modal-preview pattern με suppliers (όχι το ελαφρύ description-style
+  confirm, αφού εδώ γίνεται πραγματική διαγραφή γραμμής + FK reassignment).
+- **Δοκιμή**: throwaway αντίγραφο πραγματικής βάσης — Python-level επιβεβαίωση
+  reassignment και στα δύο πίνακες + διαγραφή γραμμής (δοκιμή σε δύο πραγματικά
+  usage=1 μηχανήματα, αφού η αυτόματη ανίχνευση δεν βρήκε τίποτα), πλήρες end-to-end
+  Electron smoke test (χειροκίνητο merge flow: modal preview με σωστό κείμενο/μέτρημα,
+  commit, κλείσιμο modal).
+- **Παραμένουν ανοιχτά** (βλ. TODO.md): "μεταφορικό μέσο" πρόβλημα (πινακίδες
+  προμηθευτή μπερδεύονται με machine_name), χειρόγραφες σημειώσεις σε γενικά
+  τιμολόγια, ~30 machines usage=1 ανεξέλεγκτα, πιθανό split-tool, OCR-substitution
+  tier (ίδιο αναβλήθηκε και στα άλλα δύο εργαλεία).
+
 ## [intake-tool] Πολλαπλές σελίδες PDF ανά τιμολόγιο — staging + batch εργαλεία (2026-09-10)
 
 Η ρίζα αποδείχθηκε πιο συγκεκριμένη απ' ό,τι έδειχνε το αρχικό TODO: κανένα σημείο που
