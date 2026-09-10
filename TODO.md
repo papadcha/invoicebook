@@ -129,30 +129,24 @@ regex). Τίποτα δεν έχει χτιστεί ακόμα. Όταν συν�
       file παραπάνω για να συνεχίσεις από εκεί.
 - Καμία υλοποίηση εργαλείου δεν έχει ξεκινήσει.
 
-## [invoicebook/intake-tool] Ίδιο εργαλείο dedup/merge χρειάζεται και για description (όχι μόνο machines/suppliers)
+## [invoicebook/intake-tool] Ίδιο εργαλείο dedup/merge χρειάζεται και για machines (description ήδη έγινε)
 
-2026-09-09: sweep στα λιπαντικά (`category='Λιπαντικά'`, βλ.
-`[[project-galatista-lubricant-description-cleanup]]`) έδειξε ότι το ίδιο πρόβλημα διπλότυπων
-από μορφοποίηση (κενά/παύλες/κεφαλαία/OCR) υπάρχει και στο ελεύθερο κείμενο `description` των
-`tbl_invoice_items`, όχι μόνο σε machines/suppliers. Root-cause fix (`_canonicalize_description`,
-commit `6be4e57`) ήδη μπήκε στο backend — τρέχει σε κάθε write, εμποδίζει ΝΕΑ διπλότυπα. Αυτό
-που λείπει είναι ένα **γενικό in-app εργαλείο** (όχι μόνο για description) που να κάνει αυτή τη
-δουλειά οπτικά αντί για ad-hoc Python scripts/artifacts από τον Claude κάθε φορά:
-- [ ] Οθόνη «Ομαδοποίηση/Καθαρισμός» (ή tab μέσα στο υπάρχον «Περιήγηση & Διόρθωση») που δείχνει
-      near-duplicate ομάδες πάνω σε ΟΠΟΙΟΔΗΠΟΤΕ ελεύθερο πεδίο (description, machine_name,
-      supplier name) — ίδια ιδέα με το artifact που φτιάχτηκε σήμερα για τα λιπαντικά (3 modes:
-      ακριβής κανονικοποίηση / γνωστές κατηγορίες / προτεινόμενη τελική μορφή), αλλά μόνιμο μέσα
-      στο πρόγραμμα, όχι one-off HTML.
-- [ ] Merge-by-click UI πάνω στις ομάδες (reassign FK για machines, batch `UPDATE description`
-      για ελεύθερο κείμενο) — προαπαιτεί το `merge_machines(keep_id, merge_id)` /
-      `merge_suppliers(keep_id, merge_id)` που ήδη εκκρεμούν παραπάνω· η description-εκδοχή είναι
-      απλούστερη (κανένα FK, μόνο batch UPDATE στο ίδιο string).
+Το description-dedup μέρος υλοποιήθηκε 2026-09-10 (βλ. DONE.md) — νέα κάρτα μέσα στο
+ήδη υπάρχον tab «🧹 Καθαρισμός» του intake-tool, `get_description_merge_candidates()`/
+`merge_item_descriptions()` στο invoicebook `database.py` (reuse του ήδη υπάρχοντος
+`_normalize_machine_code`, καμία νέα normalization λογική). Ό,τι μένει ανοιχτό:
+- [ ] Το ίδιο tab/pattern για μηχανήματα (`tbl_machines`) — προαπαιτεί
+      `merge_machines(keep_id, merge_id)` που ακόμα εκκρεμεί (βλ. ξεχωριστό TODO item
+      παρακάτω). Σε αντίθεση με το description, εδώ υπάρχει πραγματικό FK
+      (`tbl_invoice_items.machine_id`), άρα το merge είναι πιο κοντά στο μοτίβο του
+      ήδη υλοποιημένου `merge_suppliers`, όχι στο απλό batch UPDATE του description.
 - [ ] Ξεχωριστό tier στο UI για "OCR letter-substitution" υποψήφιους (π.χ. BRE↔SAE) — ΔΕΝ πιάνεται
       από την αυτόματη κανονικοποίηση (σκόπιμα, βλ. memory) γιατί είναι διαφορετικά γράμματα, όχι
       μορφοποίηση — χρειάζεται δικό του, πιο αργό, με-άνοιγμα-PDF βήμα, ίδιο μοτίβο με το σημερινό
-      Visco/Φίλτρα/AGRON εύρημα.
-- Καμία υλοποίηση δεν έχει ξεκινήσει — μόνο η ανάγκη επιβεβαιώθηκε ξανά σήμερα σε δεύτερο,
-  διαφορετικό πεδίο (description) από τα machines/suppliers.
+      Visco/Φίλτρα/AGRON εύρημα. Αναβλήθηκε σκόπιμα στο description tool για τον ίδιο λόγο.
+- [ ] Τα άλλα δύο modes από τη μεθοδολογία του 2026-09-09 ("γνωστές κατηγορίες",
+      "προτεινόμενη τελική μορφή") δεν υλοποιήθηκαν — μόνο το "ακριβής κανονικοποίηση"
+      mode (ίδιο equivalence class με το ήδη υπάρχον `_canonicalize_description`).
 
 ## [Cross-repo] 3 ξεχωριστά Electron windows
 

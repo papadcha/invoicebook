@@ -3,6 +3,38 @@
 Ό,τι έχει ολοκληρωθεί από τη λίστα εργασιών του project Γαλάτιστας. Βλ.
 `TODO.md` για ό,τι μένει. Ίδιο αρχείο και στα 3 repos.
 
+## [invoicebook/intake-tool] In-app εργαλείο ομαδοποίησης description (2026-09-10)
+
+Δεύτερο κομμάτι της ίδιας σειράς δουλειάς με το supplier merge tool (βλ. παρακάτω) —
+για το ελεύθερο κείμενο `tbl_invoice_items.description` αντί για προμηθευτές. Πολύ πιο
+απλό από το supplier tool: καμία FK εμπλέκεται (η "συγχώνευση" είναι απλό
+`UPDATE ... SET description=?`, καμία διαγραφή/reassignment γραμμής).
+
+- **`invoicebook` `backend/database.py`**: `get_description_merge_candidates()` και
+  `merge_item_descriptions(category, keep, merge_list)`. Καμία νέα normalization
+  συνάρτηση χρειάστηκε — ξαναχρησιμοποιεί το ήδη υπάρχον `_normalize_machine_code`
+  (το ίδιο που ήδη χρησιμοποιεί το `_canonicalize_description` για να εμποδίζει ΝΕΑ
+  διπλότυπα σε κάθε write) πάνω σε όλα τα distinct descriptions, ομαδοποιημένα με hash
+  σε `(category, normalized_code)` — O(n), όχι pairwise (5.382 distinct descriptions θα
+  ήταν ~14.5M ζεύγη pairwise, το supplier tool's 271×270 approach δεν θα έφτανε εδώ).
+- **`intake-tool`**: δεύτερη κάρτα μέσα στο ήδη υπάρχον tab "🧹 Καθαρισμός" —
+  "Περιγραφές — Υποψήφιες Ομαδοποιήσεις". Χρήση του ήδη υπάρχοντος ελαφρού
+  `App.confirmDelete` modal αντί για custom preview modal (μικρότερο ρίσκο από
+  supplier merge, καμία γραμμή χάνεται).
+- **Δοκιμή πάνω σε throwaway αντίγραφο της πραγματικής βάσης**: 195 clusters σε όλες
+  τις κατηγορίες (117 σε Ανταλλακτικά, 39 σε Αναλώσιμα/Γενικά, 24 σε Λιπαντικά, κ.λπ.) —
+  ποιοτικά καθαρά αποτελέσματα (καμία false-positive ανάγκη διόρθωσης, σε αντίθεση με
+  το supplier STRONG tier — αναμενόμενο, αφού το `_normalize_machine_code` είναι ήδη
+  δοκιμασμένη, deployed συνάρτηση, όχι νέα heuristic). Πλήρες end-to-end smoke test
+  (tab → κάρτα description → merge button → confirm → μείωση λίστας) μέσα από
+  πραγματικό Electron session πριν το commit.
+- **Deferred (ίδια λογική με το doc-number-gap tier του supplier tool)**:
+  "OCR letter-substitution" tier (π.χ. BRE↔SAE) και τα άλλα δύο modes της
+  μεθοδολογίας του 2026-09-09 ("γνωστές κατηγορίες", "προτεινόμενη τελική μορφή") —
+  βλ. TODO.md. Machines (`tbl_machines`) παραμένει ξεχωριστό ανοιχτό item, χρειάζεται
+  πρώτα `merge_machines(keep_id, merge_id)` (έχει πραγματικό FK, πιο κοντά στο
+  supplier tool's pattern παρά στο description tool's απλό batch UPDATE).
+
 ## [invoicebook/intake-tool] In-app εργαλείο συγχώνευσης προμηθευτών (2026-09-10)
 
 Υλοποιήθηκε η "πλήρης έκδοση" που είχε αποφασιστεί στις 2026-09-05 (βλ.
