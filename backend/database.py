@@ -132,6 +132,146 @@ def delete_supplier(supplier_id):
         conn.execute('DELETE FROM tbl_suppliers WHERE id=?', (supplier_id,))
 
 
+# ── ΣΥΓΧΩΝΕΥΣΗ ΠΡΟΜΗΘΕΥΤΩΝ (dedup) ────────────────────────────────────────────
+
+_SUPPLIER_NAME_STOPWORDS = {
+    'αφοι', 'αφων', 'σια', 'υιοι', 'υιος', 'υιου', 'υιων',
+    'ανωνυμη', 'εταιρια', 'εταιρειας', 'ομορρυθμη', 'ετερορρυθμη',
+    'ιδιωτικη', 'κεφαλαιουχικη', 'περιορισμενης', 'ευθυνης', 'ike',
+}
+
+
+def _normalize_greek(s):
+    # Ίδια λογική με το normalizeGreek() του js/import.js (intake-tool):
+    # NFD + αφαίρεση διακριτικών + πεζά + τελικό ς -> σ, ώστε τα tokens να
+    # ταιριάζουν ανεξάρτητα από τόνους/κεφαλαία.
+    if not s:
+        return ''
+    decomposed = unicodedata.normalize('NFD', s)
+    stripped = ''.join(c for c in decomposed if unicodedata.category(c) != 'Mn')
+    return stripped.lower().replace('ς', 'σ').strip()
+
+
+def _name_tokens(s):
+    return {
+        w for w in re.split(r'[^a-zα-ω0-9]+', _normalize_greek(s))
+        if len(w) >= 3 and w not in _SUPPLIER_NAME_STOPWORDS
+    }
+
+
+def _vat_checksum_valid(vat):
+    """Έλεγχος ψηφίου-ελέγχου ελληνικού ΑΦΜ (mod-11 -> mod-10 επί των πρώτων 8
+    ψηφίων, το 9ο ψηφίο είναι το check digit). None αν το ΑΦΜ δεν είναι
+    ελέγξιμο (λείπει/όχι ακριβώς 9 ψηφία), αλλιώς True/False."""
+    if not vat or not re.fullmatch(r'\d{9}', vat):
+        return None
+    digits = [int(c) for c in vat]
+    total = sum(d * (2 ** (8 - i)) for i, d in enumerate(digits[:8]))
+    return (total % 11) % 10 == digits[8]
+
+
+def _hamming_close_vat(a, b):
+    if not a or not b or len(a) != len(b) or len(a) < 8:
+        return False
+    diff = sum(1 for x, y in zip(a, b) if x != y)
+    return 0 < diff <= 2
+
+
+def get_supplier_merge_candidates():
+    """Υποψήφιοι προς συγχώνευση προμηθευτές, σε δύο βαθμίδες εμπιστοσύνης:
+    STRONG (κοντινά ΑΦΜ όπου το checksum λύνει ποιο είναι σωστό, ΚΑΙ επιπλέον
+    υπάρχει έστω κι ελάχιστη ομοιότητα ονόματος) και MEDIUM (επικάλυψη
+    ονόματος μόνο, μετά από φιλτράρισμα κοινών tokens).
+
+    Σκόπιμα ΔΕΝ αρκεί μόνο του το ΑΦΜ-hamming-closeness+checksum για STRONG:
+    τα ΑΦΜ απονέμονται περίπου διαδοχικά από την εφορία, άσχετα με το όνομα
+    της επιχείρησης — δύο εντελώς άσχετοι προμηθευτές μπορεί να έχουν τυχαία
+    ΑΦΜ που διαφέρουν κατά 1-2 ψηφία (επιβεβαιώθηκε στην πράξη σε δοκιμή πάνω
+    σε αντίγραφο της πραγματικής βάσης — δύο εντελώς διαφορετικές επωνυμίες
+    βγήκαν σαν "STRONG" πριν προστεθεί αυτός ο περιορισμός). Το checksum
+    χρησιμεύει ΜΟΝΟ για να λύσει ΠΟΙΟ από δύο ήδη-υποψήφια (λόγω ονόματος)
+    ΑΦΜ είναι το σωστό — ίδια χρήση με το πώς δούλεψε διαδραστικά με τον
+    χρήστη στο χειροκίνητο sweep του 2026-09-05."""
+    suppliers = get_all_suppliers()
+
+    name_freq = {}
+    tokens_by_id = {}
+    for s in suppliers:
+        toks = _name_tokens(s['name'])
+        tokens_by_id[s['id']] = toks
+        for t in toks:
+            name_freq[t] = name_freq.get(t, 0) + 1
+    # tokens που εμφανίζονται σε >3 προμηθευτές είναι πολύ γενικά (μικρά
+    # ονόματα/οικογενειακοί όροι) για να μετράνε σαν σήμα ομοιότητας.
+    common_tokens = {t for t, c in name_freq.items() if c > 3}
+
+    candidates = []
+    for i, a in enumerate(suppliers):
+        for b in suppliers[i + 1:]:
+            toks_a = tokens_by_id[a['id']] - common_tokens
+            toks_b = tokens_by_id[b['id']] - common_tokens
+            overlap = toks_a & toks_b
+            min_size = min(len(toks_a), len(toks_b))
+            name_match = bool(overlap) and (len(overlap) >= 2 or (len(overlap) == 1 and min_size <= 1))
+
+            vat_resolved = None
+            a_vat, b_vat = a.get('vat_number'), b.get('vat_number')
+            if a_vat and b_vat and _hamming_close_vat(a_vat, b_vat):
+                a_valid = _vat_checksum_valid(a_vat)
+                b_valid = _vat_checksum_valid(b_vat)
+                if a_valid is True and b_valid is False:
+                    vat_resolved = (a, b, a_vat)
+                elif b_valid is True and a_valid is False:
+                    vat_resolved = (b, a, b_vat)
+
+            if vat_resolved and overlap:
+                keep, merge, vat = vat_resolved
+                candidates.append(_merge_candidate(keep, merge, 'STRONG',
+                    f'ΑΦΜ διαφέρει λίγα ψηφία (checksum επιβεβαιώνει {vat}) '
+                    f'+ κοινά tokens ονόματος: {", ".join(sorted(overlap))}'))
+            elif name_match:
+                # Ο προμηθευτής με το μεγαλύτερο id θεωρείται πιο πρόσφατος·
+                # προτείνεται σαν "προς συγχώνευση" απλά ως προεπιλογή — ο
+                # χρήστης μπορεί να αντιστρέψει κατεύθυνση στο UI.
+                keep, merge = (a, b) if a['id'] < b['id'] else (b, a)
+                candidates.append(_merge_candidate(keep, merge, 'MEDIUM',
+                    f'κοινά tokens ονόματος: {", ".join(sorted(overlap))}'))
+
+    tier_order = {'STRONG': 0, 'MEDIUM': 1}
+    candidates.sort(key=lambda c: tier_order[c['tier']])
+    return candidates
+
+
+def _merge_candidate(keep, merge, tier, reason):
+    return {
+        'keep_id': keep['id'], 'keep_name': keep['name'], 'keep_vat': keep.get('vat_number'),
+        'merge_id': merge['id'], 'merge_name': merge['name'], 'merge_vat': merge.get('vat_number'),
+        'tier': tier, 'reason': reason,
+    }
+
+
+def get_supplier_merge_preview(keep_id, merge_id):
+    with get_db() as conn:
+        rows = conn.execute(
+            'SELECT id, doc_number, doc_date, total_amount FROM tbl_invoices '
+            'WHERE supplier_id=? ORDER BY doc_date', (merge_id,)
+        ).fetchall()
+    return {'invoice_count': len(rows), 'invoices': [dict(r) for r in rows]}
+
+
+def merge_suppliers(keep_id, merge_id):
+    if keep_id == merge_id:
+        raise ValueError('Δεν μπορεί να συγχωνευτεί προμηθευτής με τον εαυτό του')
+    with get_db() as conn:
+        cur = conn.execute(
+            'UPDATE tbl_invoices SET supplier_id=? WHERE supplier_id=?',
+            (keep_id, merge_id)
+        )
+        reassigned = cur.rowcount
+        conn.execute('DELETE FROM tbl_suppliers WHERE id=?', (merge_id,))
+    return {'reassigned_invoices': reassigned}
+
+
 # ── ΤΙΜΟΛΟΓΙΑ ─────────────────────────────────────────────────────────────────
 
 def _pdf_available(filename):
