@@ -705,6 +705,65 @@ def _find_or_create_machine(conn, name):
     return cur.lastrowid
 
 
+def get_machine_merge_candidates():
+    """Υποψήφια μηχανήματα προς συγχώνευση -- ΜΟΝΟ exact-normalized-match (ίδιο
+    equivalence class με _normalize_machine_code/_find_or_create_machine), σε
+    αντίθεση με το supplier tool: το tbl_machines δεν έχει καμία δεύτερη
+    ταυτοποίηση σαν το ΑΦΜ, άρα κανένα STRONG tier δεν είναι δυνατό. Η
+    πραγματική αξία του dedup sweep 2026-09-06 ήταν κυρίως fuzzy/σημασιολογικό
+    ταίριασμα (διάβασμα PDF) -- ρητά εκτός αυτοματισμού, ίδιο με το OCR-
+    substitution tier του description/supplier tool. Αναμένονται λίγα ή
+    καθόλου αποτελέσματα σε ήδη καθαρισμένα δεδομένα -- το χειροκίνητο merge-
+    by-id παραμένει ο κύριος τρόπος χρήσης εδώ."""
+    machines = list_machines()
+    groups = {}
+    for m in machines:
+        norm = _normalize_machine_code(m['name'])
+        if not norm:
+            continue
+        groups.setdefault(norm, []).append(m)
+
+    candidates = []
+    for group in groups.values():
+        if len(group) < 2:
+            continue
+        group.sort(key=lambda m: m['id'])
+        keep, others = group[0], group[1:]
+        candidates.append({
+            'keep_id': keep['id'], 'keep_name': keep['name'],
+            'others': [{'id': o['id'], 'name': o['name']} for o in others],
+        })
+    return candidates
+
+
+def get_machine_merge_preview(keep_id, merge_id):
+    with get_db() as conn:
+        items = conn.execute(
+            'SELECT ii.description, ii.category, i.doc_date, i.doc_number '
+            'FROM tbl_invoice_items ii JOIN tbl_invoices i ON i.id = ii.invoice_id '
+            'WHERE ii.machine_id=? ORDER BY i.doc_date', (merge_id,)
+        ).fetchall()
+        alloc_count = conn.execute(
+            'SELECT COUNT(*) as c FROM tbl_allocations WHERE machine_id=?', (merge_id,)
+        ).fetchone()['c']
+    return {
+        'item_count': len(items), 'allocation_count': alloc_count,
+        'items': [dict(r) for r in items[:50]],
+    }
+
+
+def merge_machines(keep_id, merge_id):
+    if keep_id == merge_id:
+        raise ValueError('Δεν μπορεί να συγχωνευτεί μηχάνημα με τον εαυτό του')
+    with get_db() as conn:
+        # Δύο FK, όχι ένα -- tbl_allocations (bulk-pool διαμοιρασμός 2ου σταδίου)
+        # αναφέρεται σε machine_id ξεχωριστά από τα tbl_invoice_items.
+        cur1 = conn.execute('UPDATE tbl_invoice_items SET machine_id=? WHERE machine_id=?', (keep_id, merge_id))
+        cur2 = conn.execute('UPDATE tbl_allocations SET machine_id=? WHERE machine_id=?', (keep_id, merge_id))
+        conn.execute('DELETE FROM tbl_machines WHERE id=?', (merge_id,))
+    return {'reassigned_items': cur1.rowcount, 'reassigned_allocations': cur2.rowcount}
+
+
 # ── ΕΙΣΑΓΩΓΗ (STAGING) ────────────────────────────────────────────────────────
 
 def _resolve_header(conn, data):
