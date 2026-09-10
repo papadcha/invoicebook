@@ -272,6 +272,60 @@ def merge_suppliers(keep_id, merge_id):
     return {'reassigned_invoices': reassigned}
 
 
+def get_description_merge_candidates():
+    """Ομάδες περιγραφών (tbl_invoice_items.description) που κανονικοποιούνται στο ίδιο
+    κλειδί μέσω _normalize_machine_code — ΙΔΙΑ λογική με _canonicalize_description, που
+    ήδη εμποδίζει νέα διπλότυπα στο write path. Εδώ βρίσκουμε clusters σε ΗΔΗ υπάρχοντα
+    δεδομένα. Ομαδοποίηση με hash σε (category, normalized_code) — O(n), όχι pairwise
+    (5.382 distinct descriptions θα ήταν ~14.5M ζεύγη pairwise, πολύ ακριβό)."""
+    with get_db() as conn:
+        rows = conn.execute(
+            'SELECT category, description, COUNT(*) as cnt FROM tbl_invoice_items '
+            'WHERE category IS NOT NULL AND description IS NOT NULL '
+            'GROUP BY category, description'
+        ).fetchall()
+
+    groups = {}
+    for r in rows:
+        norm = _normalize_machine_code(r['description'])
+        if not norm or len(norm) < 3:
+            continue
+        groups.setdefault((r['category'], norm), []).append(
+            {'description': r['description'], 'count': r['cnt']}
+        )
+
+    candidates = []
+    for (category, norm), variants in groups.items():
+        if len(variants) < 2:
+            continue
+        variants.sort(key=lambda v: -v['count'])
+        keep, others = variants[0], variants[1:]
+        candidates.append({
+            'category': category,
+            'keep': keep['description'], 'keep_count': keep['count'],
+            'variants': others,
+            'affected_rows': sum(v['count'] for v in others),
+        })
+    candidates.sort(key=lambda c: -c['affected_rows'])
+    return candidates
+
+
+def merge_item_descriptions(category, keep, merge_list):
+    if not merge_list:
+        raise ValueError('Καμία τιμή προς συγχώνευση')
+    with get_db() as conn:
+        total = 0
+        for m in merge_list:
+            if m == keep:
+                continue
+            cur = conn.execute(
+                'UPDATE tbl_invoice_items SET description=? WHERE category=? AND description=?',
+                (keep, category, m)
+            )
+            total += cur.rowcount
+    return {'updated_rows': total}
+
+
 # ── ΤΙΜΟΛΟΓΙΑ ─────────────────────────────────────────────────────────────────
 
 def _pdf_available(filename):
