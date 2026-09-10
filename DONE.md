@@ -3,6 +3,35 @@
 Ό,τι έχει ολοκληρωθεί από τη λίστα εργασιών του project Γαλάτιστας. Βλ.
 `TODO.md` για ό,τι μένει. Ίδιο αρχείο και στα 3 repos.
 
+## [intake-tool] Πλήρες συμπιεσμένο αρχείο pdf_store + κουμπί Επαναφορά (2026-09-10)
+
+Το σημερινό backup του pdf_store ήταν μόνο incremental (`rclone copy`) — γρήγορο για
+συχνό backup, αλλά μια πλήρης επαναφορά θα σήμαινε τράβηγμα 2.444 ξεχωριστών αρχείων
+(~1.2GB) ένα-ένα, αργό πάνω από NAS (επιβεβαιωμένο). Δεν υπήρχε κανένα restore
+μηχανισμό για το pdf_store, μόνο η βάση είχε κουμπί "Επαναφορά".
+
+- **`backend/backup.py`**: `_do_pdf_archive(folder, force=False)` — zip ολόκληρου του
+  pdf_store με `ZIP_STORED` (τα PDF είναι ήδη εσωτερικά συμπιεσμένα, deflate θα
+  κόστιζε CPU/χρόνο για μηδενικό όφελος), staleness-gated (`PDF_ARCHIVE_MIN_DAYS=7`) —
+  τρέχει αυτόματα μέσα στο ήδη υπάρχον `run_all_backups`, όχι πραγματικός scheduler
+  (δεν υπάρχει κανένας στο app). Κρατάει τα `PDF_ARCHIVE_KEEP=4` πιο πρόσφατα ανά
+  προορισμό (όχι το `max_keep=20` της βάσης — 24GB/προορισμό θα ήταν υπερβολικό).
+  `restore_pdf_store(path)`: allowlist έλεγχος, `zf.testzip()` integrity check
+  (πραγματικός CRC έλεγχος), rename-aside του τρέχοντος pdf_store (φτηνή πράξη ίδιου
+  δίσκου αντί για αντιγραφή 1.2GB) πριν το extract — directory-equivalent του DB's
+  auto-snapshot-πριν-το-restore.
+- **`intake-tool`**: 4η κάρτα στο Ρυθμίσεις tab "Πλήρες Αρχείο pdf_store" — λίστα
+  υπαρχόντων αρχείων ανά προορισμό με κουμπί "Επαναφορά" (ίδιο confirm/reload μοτίβο
+  με το DB restore), κουμπί "Δημιουργία Τώρα" που παρακάμπτει το staleness gate.
+- **Δοκιμή**: throwaway μικρό pdf_store (όχι το πραγματικό 1.2GB) + throwaway
+  destination — επιβεβαιώθηκαν δημιουργία/staleness gate/pruning/restore μέσω απευθείας
+  κλήσεων Python, και πλήρες end-to-end smoke test μέσα από πραγματικό Electron session
+  (tab → Δημιουργία Τώρα → λίστα ενημερώνεται με πραγματική γραμμή → κουμπί Επαναφορά
+  σωστά συνδεδεμένο με το σωστό προειδοποιητικό μήνυμα).
+- **Σκόπιμα ανοιχτό follow-up** (βλ. TODO.md): ο παλιός `pdf_store.prerestore_*`
+  φάκελος δεν σκουπίζεται αυτόματα μετά από κάθε restore (σε αντίθεση με τα DB
+  prerestore snapshots) — αποδεκτό για σπάνια ενέργεια, όχι λυμένο τώρα.
+
 ## [invoicebook/intake-tool] In-app εργαλείο ομαδοποίησης description (2026-09-10)
 
 Δεύτερο κομμάτι της ίδιας σειράς δουλειάς με το supplier merge tool (βλ. παρακάτω) —
