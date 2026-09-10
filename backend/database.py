@@ -11,6 +11,7 @@ import sys
 import json
 import shutil
 import unicodedata
+import hashlib
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
@@ -21,12 +22,13 @@ _local_db_dir = os.path.dirname(os.path.abspath(__file__ + '/../database'))
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database', 'schema.sql')
 MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database')
 
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 4
 
 migration_files = {
     1: os.path.join(MIGRATIONS_DIR, 'migration_001_initial_schema.sql'),
     2: os.path.join(MIGRATIONS_DIR, 'migration_002_generalize_invoices.sql'),
     3: os.path.join(MIGRATIONS_DIR, 'migration_003_invoice_reviews.sql'),
+    4: os.path.join(MIGRATIONS_DIR, 'migration_004_dismissed_merge_candidates.sql'),
 }
 
 
@@ -130,6 +132,28 @@ def delete_supplier(supplier_id):
         if used:
             raise ValueError('Δεν μπορεί να διαγραφεί — υπάρχουν τιμολόγια αυτού του προμηθευτή')
         conn.execute('DELETE FROM tbl_suppliers WHERE id=?', (supplier_id,))
+
+
+# ── ΑΠΟΡΡΙΦΘΕΝΤΑ (Παράβλεψη) MERGE CANDIDATES — κοινό σε suppliers/machines/description ──
+# Το "Παράβλεψη" στο UI έδειχνε να δουλεύει αλλά ήταν καθαρά τοπικό στο DOM -- η
+# επόμενη φόρτωση της λίστας ξανάβρισκε το ίδιο candidate, αφού καμία απόφαση δεν
+# καταγραφόταν. Ίδιο σκεπτικό με tbl_invoice_reviews: ανθρώπινη απόφαση δεν πρέπει
+# να χάνεται όταν η αυτόματη ανίχνευση ξανατρέξει.
+
+def _load_dismissed_keys(kind):
+    with get_db() as conn:
+        rows = conn.execute(
+            'SELECT candidate_key FROM tbl_dismissed_merge_candidates WHERE kind=?', (kind,)
+        ).fetchall()
+    return {r['candidate_key'] for r in rows}
+
+
+def dismiss_merge_candidate(kind, candidate_key):
+    with get_db() as conn:
+        conn.execute(
+            'INSERT OR IGNORE INTO tbl_dismissed_merge_candidates (kind, candidate_key, dismissed_at) VALUES (?, ?, ?)',
+            (kind, candidate_key, _now())
+        )
 
 
 # ── ΣΥΓΧΩΝΕΥΣΗ ΠΡΟΜΗΘΕΥΤΩΝ (dedup) ────────────────────────────────────────────
@@ -237,6 +261,9 @@ def get_supplier_merge_candidates():
                 candidates.append(_merge_candidate(keep, merge, 'MEDIUM',
                     f'κοινά tokens ονόματος: {", ".join(sorted(overlap))}'))
 
+    dismissed = _load_dismissed_keys('supplier')
+    candidates = [c for c in candidates if c['dismiss_key'] not in dismissed]
+
     tier_order = {'STRONG': 0, 'MEDIUM': 1}
     candidates.sort(key=lambda c: tier_order[c['tier']])
     return candidates
@@ -247,6 +274,7 @@ def _merge_candidate(keep, merge, tier, reason):
         'keep_id': keep['id'], 'keep_name': keep['name'], 'keep_vat': keep.get('vat_number'),
         'merge_id': merge['id'], 'merge_name': merge['name'], 'merge_vat': merge.get('vat_number'),
         'tier': tier, 'reason': reason,
+        'dismiss_key': f"{keep['id']}:{merge['id']}",
     }
 
 
@@ -294,12 +322,21 @@ def get_description_merge_candidates():
             {'description': r['description'], 'count': r['cnt']}
         )
 
+    dismissed = _load_dismissed_keys('description')
     candidates = []
     for (category, norm), variants in groups.items():
         if len(variants) < 2:
             continue
         variants.sort(key=lambda v: -v['count'])
-        keep, others = variants[0], variants[1:]
+        keep, rest = variants[0], variants[1:]
+        others = []
+        for v in rest:
+            key = _description_dismiss_key(category, keep['description'], v['description'])
+            if key in dismissed:
+                continue
+            others.append({**v, 'dismiss_key': key})
+        if not others:
+            continue
         candidates.append({
             'category': category,
             'keep': keep['description'], 'keep_count': keep['count'],
@@ -308,6 +345,13 @@ def get_description_merge_candidates():
         })
     candidates.sort(key=lambda c: -c['affected_rows'])
     return candidates
+
+
+def _description_dismiss_key(category, keep, variant):
+    # Hash αντί για απλό join -- η περιγραφή είναι ελεύθερο κείμενο, μπορεί να
+    # περιέχει οποιονδήποτε χαρακτήρα (ασφαλές διαχωριστικό ΔΕΝ εγγυάται μοναδικότητα).
+    raw = f'{category}\x1f{keep}\x1f{variant}'
+    return hashlib.sha1(raw.encode('utf-8')).hexdigest()
 
 
 def merge_item_descriptions(category, keep, merge_list):
@@ -723,15 +767,22 @@ def get_machine_merge_candidates():
             continue
         groups.setdefault(norm, []).append(m)
 
+    dismissed = _load_dismissed_keys('machine')
     candidates = []
     for group in groups.values():
         if len(group) < 2:
             continue
         group.sort(key=lambda m: m['id'])
-        keep, others = group[0], group[1:]
+        keep, rest = group[0], group[1:]
+        others = [
+            {'id': o['id'], 'name': o['name'], 'dismiss_key': f"{keep['id']}:{o['id']}"}
+            for o in rest if f"{keep['id']}:{o['id']}" not in dismissed
+        ]
+        if not others:
+            continue
         candidates.append({
             'keep_id': keep['id'], 'keep_name': keep['name'],
-            'others': [{'id': o['id'], 'name': o['name']} for o in others],
+            'others': others,
         })
     return candidates
 

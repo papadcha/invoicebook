@@ -103,6 +103,18 @@ CREATE TABLE tbl_invoice_reviews (
   reviewed_at TEXT NOT NULL
 );
 
+-- Απορριφθέντα (Παράβλεψη) υποψήφια merge candidates (suppliers/machines/description
+-- dedup tools, βλ. database.py) — ίδιο σκεπτικό με tbl_invoice_reviews: ανθρώπινη
+-- απόφαση που δεν πρέπει να χαθεί όταν η αυτόματη ανίχνευση ξανατρέξει (π.χ. tab
+-- reload) — βλ. migration_004_dismissed_merge_candidates.sql.
+CREATE TABLE tbl_dismissed_merge_candidates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  candidate_key TEXT NOT NULL,
+  dismissed_at TEXT NOT NULL,
+  UNIQUE(kind, candidate_key)
+);
+
 CREATE TABLE tbl_schema_version (
   version INTEGER NOT NULL,
   applied_at TEXT NOT NULL,
