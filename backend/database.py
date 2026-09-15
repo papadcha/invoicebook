@@ -1007,6 +1007,11 @@ def confirm_staging_row(staging_id):
 
 def reject_staging_row(staging_id):
     with get_db() as conn:
+        row = conn.execute('SELECT status FROM tbl_import_staging WHERE id=?', (staging_id,)).fetchone()
+        if not row:
+            raise ValueError('Η εγγραφή εισαγωγής δεν βρέθηκε')
+        if row['status'] != 'pending':
+            raise ValueError('Η εγγραφή έχει ήδη επεξεργαστεί')
         conn.execute("UPDATE tbl_import_staging SET status='rejected' WHERE id=?", (staging_id,))
 
 
