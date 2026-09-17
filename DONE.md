@@ -3,6 +3,34 @@
 Ό,τι έχει ολοκληρωθεί από τη λίστα εργασιών του project Γαλάτιστας. Βλ.
 `TODO.md` για ό,τι μένει. Ίδιο αρχείο και στα 3 repos.
 
+## [invoicebook] Χειροκίνητα edits στο invoicebook.db — bounded snapshot tool αντί για ad-hoc `cp` (2026-09-17)
+
+Follow-up στο TODO's "Συσσώρευση invoicebook.db.bak-* αρχείων" — το προηγούμενο πλάνο
+ήταν "χειροκίνητο καθάρισμα όταν ενοχλήσει ξανά", που εξαρτάται από το κάποιος να το
+θυμηθεί/παρατηρήσει· ζητήθηκε ρητά πιο δομική/ασφαλής λύση που να μη βασίζεται σε αυτό.
+Νέο `invoices/backend/snapshot_before_edit.py` — αυτόνομο script, καμία εξάρτηση από
+άλλο repo: `python backend/snapshot_before_edit.py "περιγραφή"` γράφει το ίδιο
+`invoicebook.db.bak-<περιγραφή>-<timestamp>` με πριν, αλλά με αυτόματο keep-last-30
+pruning (ίδιο keep-last-N πνεύμα με το intake-tool's DB backup rotation). Τεκμηριώθηκε
+στο `invoices/CLAUDE.md` σαν η ρητή σύμβαση αντί για raw `cp`, ώστε να είναι
+ανακαλύψιμο από οποιαδήποτε μελλοντική συνεδρία, όχι μόνο "στο μυαλό" του τρέχοντος
+assistant. Δοκιμάστηκε σε throwaway φάκελο (6 snapshots, KEEP=3 → σωστά κράτησε τα 3
+πιο πρόσφατα) πριν εφαρμοστεί στο πραγματικό repo.
+
+## [intake-tool] pdf_store.prerestore_* φάκελοι — bounded automatic pruning (2026-09-17)
+
+Follow-up στο TODO's "pdf_store prerestore φάκελοι δεν σκουπίζονται αυτόματα" — ίδιο
+σκεπτικό με το bak-* θέμα παραπάνω, ζητήθηκε δομική λύση αντί για UI υπενθύμιση που
+εξαρτάται από κάποιον να τη δει/ενεργήσει. Νέο `PRERESTORE_KEEP = 2` +
+`_prune_prerestore_folders()` στο `backend/backup.py`, καλείται αυτόματα μετά από κάθε
+επιτυχή `restore_pdf_store()` — κρατάει πάντα τα 2 πιο πρόσφατα prerestore snapshots
+(bounded rotation, ίδιο πνεύμα με το ήδη υπάρχον `max_keep` των DB backups),
+ποτέ μηδέν (πάντα μένει τουλάχιστον ένα δίχτυ ασφαλείας) ούτε ασυγκράτητη συσσώρευση.
+Δοκιμάστηκε σε throwaway φάκελο (4 fake prerestore φάκελοι, KEEP=2 → σωστά κράτησε τους
+2 πιο πρόσφατους) — δεν υπήρχαν πραγματικοί τέτοιοι φάκελοι στο περιβάλλον για να
+δοκιμαστεί end-to-end (η λειτουργία restore δεν έχει ξανατρέξει, βλ. παλιότερο
+έλεγχο 2026-09-13).
+
 ## [invoicebook] Machine dedup sweep — πρώτο πέρασμα στα usage=1 μηχανήματα (2026-09-17)
 
 Ξεκίνησε από τυχαίο εύρημα: το machine "ΚΟΑΕΒ" (invoice 1722, ΗΝΙΟΧΟΣ ΔΙΟΙΚΗΤΗΡΙΟΥ Α.Ε.)
