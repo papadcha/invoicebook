@@ -586,6 +586,72 @@ def delete_invoice_item(item_id):
         conn.execute('DELETE FROM tbl_invoice_items WHERE id=?', (item_id,))
 
 
+def split_invoice_item(item_id, splits):
+    """Διασπά μία γραμμή τιμολογίου σε πολλές (π.χ. 4 τεμάχια φίλτρου που πήγαν σε 2
+    διαφορετικά μηχανήματα, 2+2) — `splits` = [{'machine_name', 'quantity', 'value'}, ...],
+    μήκους >=2. Πριν αγγιχτεί η βάση, απορρίπτει αν sum(quantity)/sum(value) δεν
+    ταιριάζουν ΑΚΡΙΒΩΣ (μικρή float ανοχή) με την αρχική γραμμή -- πραγματικό bug που
+    βρέθηκε χειροκίνητα σε ένα από τα 3 πρώτα split (invoice 1306, "U12+", 2026-09-17):
+    ξεχάστηκε να μειωθεί η αρχική ποσότητα/αξία, το άθροισμα δεν ταίριαζε πια με το
+    header total, εντοπίστηκε μόνο αργότερα από reconciliation check. Το πρώτο split
+    γίνεται UPDATE στην ΙΔΙΑ γραμμή (id σταθερό, ίδιο σκεπτικό με το update_invoice's
+    "preserves item ids on purpose") -- τα υπόλοιπα INSERT νέων γραμμών, αντιγράφοντας
+    code/description/unit/vat_pct/category/efk_eligible από την αρχική."""
+    if len(splits) < 2:
+        raise ValueError('Χρειάζονται τουλάχιστον 2 διαχωρισμοί για split')
+
+    with get_db() as conn:
+        item = conn.execute('SELECT * FROM tbl_invoice_items WHERE id=?', (item_id,)).fetchone()
+        if not item:
+            raise ValueError(f'Δεν βρέθηκε γραμμή id={item_id}')
+
+        pool = conn.execute(
+            'SELECT id FROM tbl_bulk_pools WHERE invoice_item_id=?', (item_id,)
+        ).fetchone()
+        if pool:
+            raise ValueError(
+                'Δεν διασπάται -- αυτή η γραμμή είναι bulk/έχει ήδη διαμοιρασμό. '
+                'Χρησιμοποίησε το tab Αποθέματα προς Διαμοιρασμό αντ\' αυτού.'
+            )
+
+        total_qty = sum(s['quantity'] for s in splits)
+        total_val = sum(s['value'] for s in splits)
+        if item['quantity'] is not None and abs(total_qty - item['quantity']) > 0.001:
+            raise ValueError(
+                f'Το άθροισμα ποσοτήτων ({total_qty}) δεν ταιριάζει με την αρχική '
+                f'ποσότητα ({item["quantity"]})'
+            )
+        if item['value'] is not None and abs(total_val - item['value']) > 0.01:
+            raise ValueError(
+                f'Το άθροισμα αξιών ({total_val}) δεν ταιριάζει με την αρχική '
+                f'αξία ({item["value"]})'
+            )
+
+        new_ids = [item_id]
+        first = splits[0]
+        machine_id0 = _find_or_create_machine(conn, first.get('machine_name'))
+        unit_price0 = (first['value'] / first['quantity']) if first['quantity'] else None
+        conn.execute(
+            'UPDATE tbl_invoice_items SET quantity=?, unit_price=?, value=?, machine_id=? WHERE id=?',
+            (first['quantity'], unit_price0, first['value'], machine_id0, item_id)
+        )
+        for s in splits[1:]:
+            machine_id = _find_or_create_machine(conn, s.get('machine_name'))
+            unit_price = (s['value'] / s['quantity']) if s['quantity'] else None
+            cur = conn.execute(
+                '''INSERT INTO tbl_invoice_items
+                   (invoice_id, code, description, unit, quantity, unit_price, value, vat_pct,
+                    category, machine_id, efk_eligible)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (item['invoice_id'], item['code'], item['description'], item['unit'],
+                 s['quantity'], unit_price, s['value'], item['vat_pct'],
+                 item['category'], machine_id, item['efk_eligible'])
+            )
+            new_ids.append(cur.lastrowid)
+
+        return {'ok': True, 'item_ids': new_ids}
+
+
 # ── PDF ΣΑΡΩΜΕΝΩΝ ΤΙΜΟΛΟΓΙΩΝ ──────────────────────────────────────────────────
 # "Υιοθέτηση" — το αρχείο ΜΕΤΑΚΙΝΕΙΤΑΙ (όχι αντιγραφή) μέσα στο pdf_store της
 # εφαρμογής, ώστε να μην εξαρτόμαστε από το αν θα μείνει εκεί που ήταν αρχικά.
