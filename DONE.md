@@ -3,6 +3,41 @@
 Ό,τι έχει ολοκληρωθεί από τη λίστα εργασιών του project Γαλάτιστας. Βλ.
 `TODO.md` για ό,τι μένει. Ίδιο αρχείο και στα 3 repos.
 
+## [intake-tool] In-app κάρτα + ρητή υπενθύμιση για τα .bak-* αρχεία (2026-09-17)
+
+Follow-up στο snapshot tool παρακάτω — ζητήθηκε ρητά να μην είναι μόνο εξωτερικό CLI
+script + τεκμηρίωση σε CLAUDE.md (που εξαρτάται από το κάποιος/κάτι να το θυμηθεί), αλλά
+πραγματικός μηχανισμός **μέσα στην ίδια την εφαρμογή**, ενεργοποιήσιμος από τον χρήστη,
+με ρητή οπτική υπενθύμιση όταν φτάσει κάποιο όριο — έτσι ώστε ο πραγματικός άνθρωπος-
+χρήστης να έχει ανεξάρτητο δίχτυ ασφαλείας ακόμα κι αν το CLI script παραλειφθεί κάποια
+φορά (π.χ. raw `cp` αντί για το script).
+
+Νέα κάρτα «Χειροκίνητα Αντίγραφα πριν από Edits (.bak-*)» στο tab **⚙ Ρυθμίσεις** του
+intake-tool (`index.html`, δίπλα στο ήδη υπάρχον «Αντίγραφα Ασφαλείας»):
+- `backend/backup.py`: `list_manual_snapshots()` (πλήθος/μέγεθος/παλιότερο-πιο πρόσφατο
+  αρχείο, `warn: true` όταν το πλήθος ≥ `MANUAL_SNAPSHOT_WARN_AT=20`) και
+  `prune_manual_snapshots()` (κρατάει τα τελευταία `MANUAL_SNAPSHOT_KEEP=30`, ίδιο
+  default με το `invoices/backend/snapshot_before_edit.py`).
+- `bridge.py`: 2 νέα cmd (`list_manual_snapshots`/`prune_manual_snapshots`).
+- `js/backup.js`: `renderManualSnapshots()` + handler για το κουμπί «🧹 Καθάρισε παλιά».
+  Πορτοκαλί banner εμφανίζεται ΜΟΝΟ όταν `warn: true`, κρυφό διαφορετικά.
+
+**Πραγματικό bug βρέθηκε κατά τη δοκιμή** (όχι μόνο static review — τρέξιμο του
+πραγματικού Electron app μέσω Playwright `_electron`, βλ. παρακάτω): το `main.js` έχει
+ΔΙΚΟ ΤΟΥ ξεχωριστό `ALLOWED_PYTHON_COMMANDS` allowlist που πρέπει να μείνει
+συγχρονισμένο με το `bridge.py`'s cmd chain (ίδιο ρητά τεκμηριωμένο πρόβλημα στο
+invoicebook's CLAUDE.md — "fails silently" αν ξεχαστεί). Τα δύο νέα commands δεν ήταν
+στη λίστα· το UI έδειχνε "Άγνωστη εντολή" μέχρι να προστεθούν εκεί επίσης. Θα είχε
+περάσει απαρατήρητο σε καθαρά static review του κώδικα.
+
+**Δοκιμή**: πλήρες end-to-end run με πραγματικό Electron app (`playwright-core`'s
+`_electron.launch()`, καμία υπάρχουσα project-skill για αυτό — χρειάστηκε custom driver,
+`node_modules/playwright-core` ήδη διαθέσιμο ως transitive dependency, ΧΩΡΙΣ να χρειαστεί
+εγκατάσταση πλήρους `playwright`). Επιβεβαιώθηκε με τα πραγματικά 11 αρχεία/87.2MB: η
+κάρτα δείχνει σωστά αριθμό/μέγεθος, το banner σωστά κρυφό (11 < 20), το κουμπί καθαρισμού
+σωστά αναφέρει "Ήδη μέσα στο όριο, τίποτα να καθαριστεί" (11 < 30) χωρίς κανένα console/
+page error. Screenshots τραβήχτηκαν πριν/μετά για οπτική επιβεβαίωση.
+
 ## [invoicebook] Χειροκίνητα edits στο invoicebook.db — bounded snapshot tool αντί για ad-hoc `cp` (2026-09-17)
 
 Follow-up στο TODO's "Συσσώρευση invoicebook.db.bak-* αρχείων" — το προηγούμενο πλάνο
