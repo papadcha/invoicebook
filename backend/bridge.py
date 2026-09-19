@@ -118,6 +118,61 @@ def handle(cmd, payload):
         database.reject_staging_row(_int_id(payload))
         return {'ok': True}
 
+    if cmd == 'parse_import_file':
+        return _parse_import_file(payload['file_path'])
+
+    if cmd == 'stage_rows':
+        return database.import_staging_rows(
+            payload['rows'], batch_label=payload.get('batch_label'), source='ocr_extract'
+        )
+
+    if cmd == 'find_duplicate_invoice':
+        return database.find_duplicate_invoice(payload['header'])
+
+    if cmd == 'merge_documents':
+        return {'invoice_id': database.merge_documents(
+            payload.get('target_invoice_id'),
+            payload.get('staging_ids') or [],
+            payload['header'],
+            payload['items'],
+            payload.get('pdf_paths_in_order') or [],
+        )}
+
+    if cmd == 'list_categories':
+        return database.list_categories()
+
+    if cmd == 'list_machines':
+        return database.list_machines()
+
+    # ── ΣΥΓΧΩΝΕΥΣΕΙΣ ─────────────────────────────────────────────────────────
+    if cmd == 'get_supplier_merge_candidates':
+        return database.get_supplier_merge_candidates()
+
+    if cmd == 'get_supplier_merge_preview':
+        return database.get_supplier_merge_preview(_int_id(payload, 'keep_id'), _int_id(payload, 'merge_id'))
+
+    if cmd == 'merge_suppliers':
+        return database.merge_suppliers(_int_id(payload, 'keep_id'), _int_id(payload, 'merge_id'))
+
+    if cmd == 'get_description_merge_candidates':
+        return database.get_description_merge_candidates()
+
+    if cmd == 'merge_item_descriptions':
+        return database.merge_item_descriptions(payload['category'], payload['keep'], payload['merge_list'])
+
+    if cmd == 'get_machine_merge_candidates':
+        return database.get_machine_merge_candidates()
+
+    if cmd == 'get_machine_merge_preview':
+        return database.get_machine_merge_preview(_int_id(payload, 'keep_id'), _int_id(payload, 'merge_id'))
+
+    if cmd == 'merge_machines':
+        return database.merge_machines(_int_id(payload, 'keep_id'), _int_id(payload, 'merge_id'))
+
+    if cmd == 'dismiss_merge_candidate':
+        database.dismiss_merge_candidate(payload['kind'], payload['candidate_key'])
+        return {'ok': True}
+
     # ── ΑΝΑΦΟΡΕΣ ──────────────────────────────────────────────────────────────
     if cmd == 'get_summary':
         return database.get_summary(payload.get('year'), payload.get('month'))

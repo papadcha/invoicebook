@@ -103,6 +103,12 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'get_invoices', 'get_invoice', 'add_invoice', 'update_invoice', 'delete_invoice',
   'attach_pdf',
   'import_staging_file', 'get_staging_batch', 'confirm_staging_row', 'reject_staging_row',
+  'parse_import_file', 'stage_rows', 'list_categories', 'list_machines',
+  'find_duplicate_invoice', 'merge_documents',
+  'get_supplier_merge_candidates', 'get_supplier_merge_preview', 'merge_suppliers',
+  'get_description_merge_candidates', 'merge_item_descriptions',
+  'get_machine_merge_candidates', 'get_machine_merge_preview', 'merge_machines',
+  'dismiss_merge_candidate',
   'get_summary',
 ]);
 
@@ -140,6 +146,11 @@ function setupIPC() {
     return err ? { ok: false, error: err } : { ok: true };
   });
 
+  ipcMain.handle('open-local-file', async (event, filePath) => {
+    const err = await shell.openPath(filePath);
+    return err ? { ok: false, error: err } : { ok: true };
+  });
+
   ipcMain.on('window-minimize', () => mainWindow?.minimize());
   ipcMain.on('window-maximize', () => {
     mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow?.maximize();
@@ -149,7 +160,7 @@ function setupIPC() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1440, height: 860,
+    width: 1280, height: 800,
     minWidth: 1024, minHeight: 700,
     frame: false,
     titleBarStyle: 'hidden',

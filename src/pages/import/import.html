@@ -1,33 +1,44 @@
-<div class="page-header">
-  <h2>Εισαγωγή CSV/JSON</h2>
-  <p>Φόρτωση δομημένων δεδομένων τιμολογίων (π.χ. από ανάγνωση σαρωμένων PDF) — κάθε γραμμή περνάει από επιβεβαίωση πριν καταχωρηθεί.</p>
+<div class="card" id="new-import-card">
+  <div style="display:flex; gap:8px; align-items:center;">
+    <button type="button" class="btn btn-accent" id="copy-prompt-btn">📋 Αντιγραφή AI Prompt</button>
+    <button type="button" class="btn btn-outline" id="pick-file-btn">Επιλογή Αρχείου (CSV/JSON)</button>
+    <span id="picked-file-name" class="mono" style="font-size:12px; color:var(--muted);">Κανένα αρχείο</span>
+    <div style="flex-grow:1;"></div>
+    <label for="batch-label" style="margin:0; white-space:nowrap;">Ετικέτα Παρτίδας</label>
+    <input type="text" id="batch-label" placeholder="π.χ. Ιανουάριος 2015" style="width:200px;">
+  </div>
 </div>
 
-<div class="card">
-  <div class="card-title">Νέα Εισαγωγή</div>
-  <div class="form-row cols-2">
-    <div>
-      <label>Αρχείο</label>
-      <div style="display:flex; gap:8px; align-items:center;">
-        <button type="button" class="btn btn-outline" id="pick-file-btn">Επιλογή Αρχείου (CSV/JSON)</button>
-        <span id="picked-file-name" class="mono" style="font-size:12px; color:var(--muted);">Κανένα αρχείο</span>
-      </div>
-    </div>
-    <div>
-      <label for="batch-label">Ετικέτα Παρτίδας</label>
-      <input type="text" id="batch-label" placeholder="π.χ. Ιανουάριος 2015">
-    </div>
+<div class="card" id="preview-card" style="display:none;">
+  <div style="display:flex; align-items:center; margin-bottom:16px;">
+    <div class="card-title" style="margin-bottom:0; padding-bottom:0; border-bottom:none;">Προεπισκόπηση — <span id="preview-supplier"></span>, <span id="preview-date"></span></div>
+    <div style="flex-grow:1;"></div>
+    <button type="button" class="btn btn-outline btn-sm" id="apply-first-btn">Εφάρμοσε 1η γραμμή σε όλες</button>
+  </div>
+  <div class="table-wrap">
+    <table class="items-table">
+      <thead><tr>
+        <th>Περιγραφή</th><th>Ποσότητα</th><th>Κατηγορία</th><th>Μηχάνημα</th>
+        <th style="text-align:center;">ΕΦΚ</th><th style="text-align:center;">Bulk</th>
+      </tr></thead>
+      <tbody id="preview-body"></tbody>
+    </table>
   </div>
   <div class="form-actions">
-    <button type="button" class="btn btn-primary" id="do-import-btn" disabled>Εισαγωγή</button>
+    <button type="button" class="btn btn-primary" id="stage-rows-btn">Καταχώρηση σε Αναμονή</button>
+    <button type="button" class="btn btn-outline" id="discard-preview-btn">Απόρριψη</button>
   </div>
 </div>
 
 <div class="card">
-  <div class="card-title">Σε Αναμονή Επιβεβαίωσης</div>
+  <div style="display:flex; align-items:center;">
+    <div class="card-title" style="margin-bottom:16px; flex-grow:1;">Σε Αναμονή Επιβεβαίωσης</div>
+    <button type="button" class="btn btn-outline btn-sm" id="staging-merge-btn" disabled style="margin-bottom:16px;">Ένωση επιλεγμένων</button>
+  </div>
   <div class="table-wrap">
-    <table>
+    <table class="table-compact">
       <thead><tr>
+        <th style="width:32px;"></th>
         <th>Παρτίδα</th><th>Προμηθευτής</th><th>Αριθμός</th><th>Ημ/νία</th>
         <th class="text-right">Σύνολο</th><th></th>
       </tr></thead>
@@ -35,3 +46,61 @@
     </table>
   </div>
 </div>
+
+<!-- ── MODAL: ΕΝΩΣΗ ΣΕΛΙΔΩΝ ΠΑΡΑΣΤΑΤΙΚΟΥ ── -->
+<div class="modal-overlay" id="merge-invoice-modal">
+  <div class="modal" style="max-width:1080px;">
+    <div class="modal-title">Ένωση Σελίδων Παραστατικού</div>
+    <p class="muted-sm" id="merge-sources-summary" style="margin-top:-8px;"></p>
+    <div class="form-row cols-2">
+      <div><label for="merge-supplier-name">Προμηθευτής</label><input type="text" id="merge-supplier-name"></div>
+      <div><label for="merge-supplier-vat">ΑΦΜ Προμηθευτή</label><input type="text" id="merge-supplier-vat"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div><label for="merge-doc-type">Τύπος Παραστατικού</label><input type="text" id="merge-doc-type"></div>
+      <div><label for="merge-doc-number">Αρ. Παραστατικού</label><input type="text" id="merge-doc-number"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div><label for="merge-doc-date">Ημερομηνία</label><input type="date" id="merge-doc-date"></div>
+      <div><label for="merge-doc-time">Ώρα</label><input type="text" id="merge-doc-time"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div><label for="merge-net-amount">Καθ. Αξία</label><input type="number" step="0.01" id="merge-net-amount"></div>
+      <div><label for="merge-vat-amount">ΦΠΑ</label><input type="number" step="0.01" id="merge-vat-amount"></div>
+    </div>
+    <div class="form-row"><div><label for="merge-total-amount">Σύνολο</label><input type="number" step="0.01" id="merge-total-amount"></div></div>
+    <hr style="border:none; border-top:1px solid var(--border); margin:16px 0;">
+    <p class="muted-sm" style="margin:0 0 10px;">Γραμμές — αποεπίλεξε ό,τι δεν πρέπει να μπει στο τελικό τιμολόγιο (π.χ. διπλές γραμμές αν μια πηγή περιέχει ήδη ολόκληρο το έγγραφο):</p>
+    <p id="merge-dup-notice" style="display:none; background:#fff3cd; padding:8px 12px; border-radius:4px; margin:0 0 10px;">
+      ⚠ Εντοπίστηκαν πιθανά διπλότυπα (πορτοκαλί γραμμές, ίδιος κωδικός/περιγραφή σε παραπάνω από μία πηγή) — οι πιο πιθανές να περισσέψουν είναι ήδη αποεπιλεγμένες, αλλά έλεγξέ τες πριν πατήσεις «Ένωση».
+    </p>
+    <div class="table-wrap" style="margin-bottom:8px;">
+      <table id="merge-items-table" class="items-table">
+        <thead><tr>
+          <th style="width:32px;"></th>
+          <th style="min-width:90px;">Πηγή</th>
+          <th style="min-width:180px;">Περιγραφή</th>
+          <th style="min-width:130px;">Κατηγορία</th>
+          <th style="min-width:90px;">Ποσότητα</th>
+          <th style="min-width:70px;">Μονάδα</th>
+          <th style="min-width:100px;">Τιμή Μονάδας</th>
+          <th style="min-width:100px;">Αξία</th>
+          <th style="min-width:70px;">ΦΠΑ%</th>
+          <th style="min-width:120px;">Μηχάνημα</th>
+          <th style="min-width:50px;">ΕΦΚ</th>
+        </tr></thead>
+        <tbody id="merge-items-body"></tbody>
+      </table>
+    </div>
+    <p id="merge-sum-status" style="font-weight:600; margin:0 0 16px;"></p>
+    <hr style="border:none; border-top:1px solid var(--border); margin:16px 0;">
+    <p class="muted-sm" style="margin:0 0 10px;">Σειρά σελίδων στο τελικό PDF:</p>
+    <div id="merge-pdf-order-list" style="margin-bottom:16px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="merge-cancel-btn">Άκυρο</button>
+      <button class="btn btn-primary" id="merge-commit-btn">Ένωση</button>
+    </div>
+  </div>
+</div>
+
+<datalist id="category-options"></datalist>

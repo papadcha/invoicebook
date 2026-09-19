@@ -1,0 +1,87 @@
+<div class="page-header">
+  <h2>Συγχωνεύσεις</h2>
+  <p>Εντοπισμός και συγχώνευση διπλότυπων εγγραφών (προμηθευτές, μηχανήματα, περιγραφές ειδών) — συντήρηση δεδομένων, μη αναστρέψιμη ενέργεια, έλεγξε πριν επιβεβαιώσεις.</p>
+</div>
+
+<div style="display:flex; gap:10px; margin-bottom:18px;">
+  <button class="subtab active" data-subtab="suppliers">ΠΡΟΜΗΘΕΥΤΕΣ</button>
+  <button class="subtab" data-subtab="machines">ΜΗΧΑΝΗΜΑΤΑ</button>
+  <button class="subtab" data-subtab="descriptions">ΠΕΡΙΓΡΑΦΕΣ</button>
+</div>
+
+<!-- ── ΠΡΟΜΗΘΕΥΤΕΣ ── -->
+<div class="subtab-panel" id="panel-suppliers">
+  <div class="card">
+    <div class="card-title">Υποψήφιοι προς Συγχώνευση</div>
+    <p class="muted-sm" style="margin-bottom:14px;">
+      Αυτόματος εντοπισμός πιθανών διπλότυπων προμηθευτών (ΑΦΜ/όνομα) —
+      <span class="badge badge-strong">STRONG</span> όταν το ΑΦΜ checksum επιβεβαιώνει ποιος είναι ο σωστός,
+      <span class="badge badge-medium">MEDIUM</span> όταν βασίζεται μόνο σε ομοιότητα ονόματος. Έλεγξε πριν συγχωνεύσεις — μη αναστρέψιμο.
+    </p>
+    <div id="supplier-candidates-list"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Χειροκίνητη Συγχώνευση</div>
+    <p class="muted-sm" style="margin-bottom:10px;">Για προμηθευτή που δεν εντοπίστηκε αυτόματα — γράψε όνομα ή ΑΦΜ:</p>
+    <div class="form-row cols-2" style="max-width:480px;">
+      <div><label for="supplier-manual-keep">Προμηθευτής προς κράτηση</label><input type="text" id="supplier-manual-keep" placeholder="Όνομα ή ΑΦΜ"></div>
+      <div><label for="supplier-manual-merge">Προμηθευτής προς συγχώνευση (διαγράφεται)</label><input type="text" id="supplier-manual-merge" placeholder="Όνομα ή ΑΦΜ"></div>
+    </div>
+    <div class="form-actions"><button type="button" class="btn btn-outline" id="supplier-manual-btn">Προεπισκόπηση &amp; Συγχώνευση</button></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Διόρθωση Επωνυμίας</div>
+    <p class="muted-sm" style="margin-bottom:10px;">Γράψε ένα υπάρχον όνομα για να το ξαναγράψεις (π.χ. διόρθωση typo) — δεν αλλάζει τιμολόγια, μόνο το όνομα προμηθευτή:</p>
+    <div class="form-row cols-2" style="max-width:480px;">
+      <div><label for="supplier-rename-search">Προμηθευτής</label><input type="text" id="supplier-rename-search" placeholder="Όνομα ή ΑΦΜ"></div>
+      <div><label for="supplier-rename-new">Νέο όνομα</label><input type="text" id="supplier-rename-new"></div>
+    </div>
+    <div class="form-actions"><button type="button" class="btn btn-outline" id="supplier-rename-btn">Αποθήκευση</button></div>
+  </div>
+</div>
+
+<!-- ── ΜΗΧΑΝΗΜΑΤΑ ── -->
+<div class="subtab-panel" id="panel-machines" style="display:none;">
+  <div class="card">
+    <div class="card-title">Υποψήφια προς Συγχώνευση</div>
+    <p class="muted-sm" style="margin-bottom:14px;">
+      Σε αντίθεση με τους προμηθευτές, τα μηχανήματα δεν έχουν δεύτερη ταυτοποίηση σαν το ΑΦΜ —
+      η αυτόματη ανίχνευση πιάνει ΜΟΝΟ ονόματα που διαφέρουν σε μορφοποίηση (κενά/παύλες/Ελληνικά-Λατινικά),
+      όχι πραγματικά διαφορετικά ονόματα του ίδιου μηχανήματος. Η χειροκίνητη συγχώνευση είναι ο κύριος τρόπος χρήσης.
+    </p>
+    <div id="machine-candidates-list"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Χειροκίνητη Συγχώνευση</div>
+    <p class="muted-sm" style="margin-bottom:10px;">Γράψε όνομα μηχανήματος:</p>
+    <div class="form-row cols-2" style="max-width:480px;">
+      <div><label for="machine-manual-keep">Μηχάνημα προς κράτηση</label><input type="text" id="machine-manual-keep" placeholder="Όνομα μηχανήματος"></div>
+      <div><label for="machine-manual-merge">Μηχάνημα προς συγχώνευση (διαγράφεται)</label><input type="text" id="machine-manual-merge" placeholder="Όνομα μηχανήματος"></div>
+    </div>
+    <div class="form-actions"><button type="button" class="btn btn-outline" id="machine-manual-btn">Προεπισκόπηση &amp; Συγχώνευση</button></div>
+  </div>
+</div>
+
+<!-- ── ΠΕΡΙΓΡΑΦΕΣ ── -->
+<div class="subtab-panel" id="panel-descriptions" style="display:none;">
+  <div class="card">
+    <div class="card-title">Υποψήφιες Ομαδοποιήσεις</div>
+    <p class="muted-sm" style="margin-bottom:14px;">
+      Παλιές γραμμές τιμολογίων που η περιγραφή τους διαφέρει μόνο σε μορφοποίηση (κενά/παύλες/κεφαλαία) —
+      η πιο συχνή γραφή προτείνεται ως η «σωστή». Ξαναγράφει description σε γραμμές τιμολογίων, καμία διαγραφή γραμμής.
+    </p>
+    <div id="description-candidates-list"></div>
+  </div>
+</div>
+
+<!-- ── MODAL: ΠΡΟΕΠΙΣΚΟΠΗΣΗ & ΣΥΓΧΩΝΕΥΣΗ (προμηθευτές/μηχανήματα) ── -->
+<div class="modal-overlay" id="merge-preview-modal">
+  <div class="modal">
+    <div class="modal-title" id="merge-preview-title">Προεπισκόπηση Συγχώνευσης</div>
+    <div id="merge-preview-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="merge-preview-cancel-btn">Άκυρο</button>
+      <button class="btn btn-danger" id="merge-preview-commit-btn">Συγχώνευση</button>
+    </div>
+  </div>
+</div>

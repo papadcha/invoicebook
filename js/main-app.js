@@ -6,6 +6,8 @@
 
 window.AppState = {
   suppliers: [],   // Φορτώνεται μία φορά στην εκκίνηση, cached για dropdowns
+  machines: [],    // idem — Εισαγωγή + Συγχωνεύσεις το χρειάζονται και τα δύο
+  categories: [],  // idem
   currentPage: null,
 };
 
@@ -41,6 +43,7 @@ const Pages = {
   invoices:  { html: 'src/pages/invoices/invoices.html',   js: 'src/pages/invoices/invoices.js' },
   suppliers: { html: 'src/pages/suppliers/suppliers.html', js: 'src/pages/suppliers/suppliers.js' },
   import:    { html: 'src/pages/import/import.html',       js: 'src/pages/import/import.js' },
+  merges:    { html: 'src/pages/merges/merges.html',       js: 'src/pages/merges/merges.js' },
 };
 
 function loadFile(url) {
@@ -100,11 +103,15 @@ window.App = {
   closeConfirm() {
     document.getElementById('confirm-modal').classList.remove('open');
     document.getElementById('confirm-ok-btn').onclick = null;
+    document.getElementById('confirm-cancel-btn').onclick = null;
   },
-  confirmDelete(msg, onOk) {
+  // onCancel προαιρετικό — π.χ. όταν το "Άκυρο" πρέπει να ανοίξει κάτι άλλο
+  // (merge dialog) αντί να είναι αδιέξοδο.
+  confirmDelete(msg, onOk, onCancel) {
     document.getElementById('confirm-msg').textContent = msg;
     document.getElementById('confirm-modal').classList.add('open');
     document.getElementById('confirm-ok-btn').onclick = () => { App.closeConfirm(); onOk(); };
+    document.getElementById('confirm-cancel-btn').onclick = () => { App.closeConfirm(); if (onCancel) onCancel(); };
   },
 };
 
@@ -112,9 +119,16 @@ window.App = {
 // STARTUP
 // ============================================================
 
-async function startup() {
+async function loadLookups() {
   window.AppState.suppliers = await pyCall('get_suppliers') || [];
-  await navigateTo('dashboard');
+  window.AppState.machines = await pyCall('list_machines') || [];
+  window.AppState.categories = await pyCall('list_categories') || [];
+}
+window.reloadLookups = loadLookups;
+
+async function startup() {
+  await loadLookups();
+  await navigateTo('import');
 }
 
 startup();

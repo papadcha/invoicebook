@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('api', {
   openImportFile: ()               => ipcRenderer.invoke('open-import-dialog'),
   pickPdfFile:    ()               => ipcRenderer.invoke('open-pdf-dialog'),
   openStoredFile: (filename)       => ipcRenderer.invoke('open-stored-file', filename),
+  openLocalFile:  (filePath)       => ipcRenderer.invoke('open-local-file', filePath),
   minimize:    () => ipcRenderer.send('window-minimize'),
   maximize:    () => ipcRenderer.send('window-maximize'),
   close:       () => ipcRenderer.send('window-close'),
