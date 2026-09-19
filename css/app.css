@@ -1,3 +1,32 @@
+@font-face {
+  font-family: 'Iosevka';
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/iosevka/iosevka-light.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Iosevka';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/iosevka/iosevka-regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Iosevka';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/iosevka/iosevka-medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Iosevka';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/iosevka/iosevka-semibold.woff2') format('woff2');
+}
+
 :root {
   --navy:    #0f2040;
   --navy2:   #1a365d;
@@ -11,7 +40,7 @@
   --border:  #d0d8e4;
   --text:    #1a2540;
   --muted:   #6b7a99;
-  --mono:    'IBM Plex Mono', monospace;
+  --mono:    'Iosevka', monospace;
   --sans:    'IBM Plex Sans', sans-serif;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
