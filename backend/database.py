@@ -697,14 +697,19 @@ def attach_pdf(invoice_id, source_path):
         os.makedirs(PDF_STORE_DIR, exist_ok=True)
         stem, ext = os.path.splitext(filename)
         dest_path = os.path.join(PDF_STORE_DIR, filename)
-        counter = 2
-        while os.path.exists(dest_path):
-            dest_path = os.path.join(PDF_STORE_DIR, f'{stem} ({counter}){ext}')
-            counter += 1
-        stored_name = os.path.basename(dest_path)
-
+        # Αν το source_path είναι ΗΔΗ αυτό το ίδιο αρχείο στο canonical του όνομα
+        # (π.χ. σύνδεση ενός ήδη υπάρχοντος "ορφανού" PDF μέσα στο pdf_store με μια
+        # εγγραφή) δεν είναι σύγκρουση ονόματος — είναι το ίδιο αρχείο. Χωρίς αυτόν
+        # τον έλεγχο, ο παρακάτω βρόχος έβλεπε το dest_path να "υπάρχει ήδη" (αφού
+        # ΕΙΝΑΙ το source) και το μετονόμαζε αχρείαστα σε "... (2).pdf" (bug,
+        # επιβεβαιώθηκε 2026-09-21 στο intake-tool όταν συνδέθηκε ορφανό PDF).
         if os.path.abspath(source_path) != os.path.abspath(dest_path):
+            counter = 2
+            while os.path.exists(dest_path):
+                dest_path = os.path.join(PDF_STORE_DIR, f'{stem} ({counter}){ext}')
+                counter += 1
             shutil.move(source_path, dest_path)
+        stored_name = os.path.basename(dest_path)
 
         conn.execute(
             'UPDATE tbl_invoices SET source_pdf_filename=?, updated_at=? WHERE id=?',
