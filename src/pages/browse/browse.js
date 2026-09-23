@@ -146,7 +146,12 @@ function applyBrowseSearch(rows) {
       <td class="mono text-right" style="white-space:nowrap;">${r.quantity != null ? fmtQty(r.quantity) : '—'} ${escapeHtml(r.unit || '')}</td>
       <td>${escapeHtml(r.machine_name || '—')}</td>
       <td>${r.efk_eligible ? '✓' : '—'}</td>
-      <td>${sev ? `<span class="badge badge-${SEV_BADGE_CLASS[sev]}" title="${escapeHtml(browseReasonById[r.invoice_id] || '')}">${SEV_LABEL[sev]}</span>` : '—'}</td>
+      <td><span class="control-cell">${sev ? `
+        <span class="badge badge-${SEV_BADGE_CLASS[sev]}" title="${escapeHtml(browseReasonById[r.invoice_id] || '')}">${SEV_LABEL[sev]}</span>
+        ${sev === 'reviewed'
+          ? `<button class="btn btn-outline btn-sm" data-unreview-invoice="${r.invoice_id}" title="Αναίρεση επιθεώρησης">↺</button>`
+          : `<button class="btn btn-outline btn-sm" data-review-invoice="${r.invoice_id}" title="Το είδα, το αφήνω όπως είναι">👁</button>`}
+      ` : '—'}</span></td>
       <td>${r.pdf_available ? `<button class="btn btn-outline btn-sm" data-open-pdf="${escapeHtml(r.source_pdf_filename)}" title="Άνοιγμα PDF">📄</button>` : ''}</td>
     </tr>
   `;
@@ -156,7 +161,38 @@ function applyBrowseSearch(rows) {
     const res = await window.api.openStoredFile(btn.dataset.openPdf);
     if (!res.ok) App.toast('Δεν ήταν δυνατό το άνοιγμα: ' + res.error, 'fail');
   }));
+  body.querySelectorAll('[data-review-invoice]').forEach(btn => btn.addEventListener('click', () => {
+    document.getElementById('review-invoice-id').value = btn.dataset.reviewInvoice;
+    document.getElementById('review-note').value = '';
+    document.getElementById('review-invoice-modal').classList.add('open');
+  }));
+  body.querySelectorAll('[data-unreview-invoice]').forEach(btn => btn.addEventListener('click', () => {
+    App.confirmDelete('Αναίρεση επιθεώρησης — το τιμολόγιο θα ξαναϋπολογιστεί αυτόματα ως σοβαρό/μέτριο;', async () => {
+      try {
+        await pyCallStrict('unreview_flagged_invoice', { invoice_id: parseInt(btn.dataset.unreviewInvoice, 10) });
+        loadBrowse();
+      } catch (e) {
+        App.toast(e.message, 'fail');
+      }
+    });
+  }));
 }
+
+document.getElementById('review-cancel-btn').addEventListener('click', () => {
+  document.getElementById('review-invoice-modal').classList.remove('open');
+});
+document.getElementById('review-ok-btn').addEventListener('click', async () => {
+  const invoiceId = parseInt(document.getElementById('review-invoice-id').value, 10);
+  const note = document.getElementById('review-note').value || null;
+  document.getElementById('review-invoice-modal').classList.remove('open');
+  try {
+    await pyCallStrict('review_flagged_invoice', { invoice_id: invoiceId, note });
+    App.toast('✅ Επιθεωρήθηκε', 'ok');
+    loadBrowse();
+  } catch (e) {
+    App.toast(e.message, 'fail');
+  }
+});
 
 let browseSearchDebounce = null;
 document.getElementById('browse-search').addEventListener('input', () => {

@@ -1,6 +1,6 @@
 <div class="page-header">
   <h2>Περιήγηση</h2>
-  <p>Αναζήτηση/φιλτράρισμα σε επίπεδο γραμμής τιμολογίου, με στατιστικά ελέγχου — read-only προς το παρόν, χωρίς επεξεργασία.</p>
+  <p>Αναζήτηση/φιλτράρισμα σε επίπεδο γραμμής τιμολογίου, με στατιστικά ελέγχου — προς το παρόν μόνο επιθεώρηση/αναίρεση, καμία επεξεργασία τιμολογίου/γραμμής ακόμα.</p>
 </div>
 
 <div class="card">
@@ -38,4 +38,23 @@
     </table>
   </div>
   <div id="browse-pagination" style="display:flex;align-items:center;gap:10px;margin-top:10px;"></div>
+</div>
+
+<!-- ── MODAL: ΕΠΙΘΕΩΡΗΣΗ ΤΙΜΟΛΟΓΙΟΥ ── -->
+<div class="modal-overlay" id="review-invoice-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-title">Επιθεώρηση Τιμολογίου</div>
+    <input type="hidden" id="review-invoice-id">
+    <p class="muted-sm" style="margin-bottom:10px;">Θα σημειωθεί ως επιθεωρημένο και θα πάψει να εμφανίζεται ως ενεργό πρόβλημα σοβαρότητας.</p>
+    <div class="form-row">
+      <div>
+        <label for="review-note">Σημείωση (προαιρετικό)</label>
+        <input type="text" id="review-note" placeholder="π.χ. Ελέγχθηκε, ok">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="review-cancel-btn">Άκυρο</button>
+      <button class="btn btn-primary" id="review-ok-btn">Επιθεώρηση</button>
+    </div>
+  </div>
 </div>

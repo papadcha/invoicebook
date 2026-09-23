@@ -196,7 +196,7 @@ def handle(cmd, payload):
         database.dismiss_merge_candidate(payload['kind'], payload['candidate_key'])
         return {'ok': True}
 
-    # ── ΠΕΡΙΗΓΗΣΗ (read-only) ────────────────────────────────────────────────
+    # ── ΠΕΡΙΗΓΗΣΗ ─────────────────────────────────────────────────────────────
     if cmd == 'list_invoice_items_by_category':
         return database.get_invoice_items_by_category(
             payload.get('category'), payload.get('date_from'), payload.get('date_to')
@@ -207,6 +207,12 @@ def handle(cmd, payload):
 
     if cmd == 'get_invoice_status_summary':
         return database.get_invoice_status_summary()
+
+    if cmd == 'review_flagged_invoice':
+        return database.add_invoice_review(_int_id(payload, 'invoice_id'), payload.get('note'))
+
+    if cmd == 'unreview_flagged_invoice':
+        return database.remove_invoice_review(_int_id(payload, 'invoice_id'))
 
     # ── ΑΠΟΘΕΜΑΤΑ ΠΡΟΣ ΔΙΑΜΟΙΡΑΣΜΟ ────────────────────────────────────────────
     if cmd == 'list_open_bulk_pools':
