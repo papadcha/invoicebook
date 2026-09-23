@@ -6,3 +6,6 @@ dist/
 # Real invoice data — database and scanned PDFs, not for version control
 backend/invoicebook.db
 backend/pdf_store/
+
+# Local ad-hoc DB backups made before manual cleanups — kept on disk, not versioned
+backend/invoicebook.db.bak*
