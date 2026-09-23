@@ -29,9 +29,13 @@ DB_PATH = os.environ.get('INVOICES_DB_PATH') or os.path.join(_data_dir, 'invoice
 
 import database
 import expvault_export
+import backup
 database.DB_NAME = DB_PATH
 database.PDF_STORE_DIR = os.path.join(os.path.dirname(DB_PATH), 'pdf_store')
 database.initialize_database()
+backup.DB_PATH = DB_PATH
+backup.PDF_STORE_DIR = database.PDF_STORE_DIR
+backup.DATA_DIR = os.path.dirname(DB_PATH)
 
 
 def _int_id(payload, key='id'):
@@ -234,6 +238,14 @@ def handle(cmd, payload):
             database, payload['path'], payload.get('date_from'), payload.get('date_to'),
             payload.get('tipos_overrides'), payload.get('exclude_ids'),
         )
+
+    # ── ΑΝΤΙΓΡΑΦΑ ΑΣΦΑΛΕΙΑΣ (backup-on-close μόνο· καμία σελίδα ρυθμίσεων ακόμα —
+    # η διαμόρφωση προορισμών γίνεται από το intake-tool's Ρυθμίσεις, ίδιο αρχείο) ──
+    if cmd == 'get_backup_config':
+        return backup.get_config()
+
+    if cmd == 'run_backup':
+        return backup.run_all_backups(payload.get('reason'))
 
     # ── ΑΠΟΘΕΜΑΤΑ ΠΡΟΣ ΔΙΑΜΟΙΡΑΣΜΟ ────────────────────────────────────────────
     if cmd == 'list_open_bulk_pools':

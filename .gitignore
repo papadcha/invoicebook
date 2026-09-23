@@ -9,3 +9,6 @@ backend/pdf_store/
 
 # Local ad-hoc DB backups made before manual cleanups — kept on disk, not versioned
 backend/invoicebook.db.bak*
+
+# Backup destinations config (mega/pcloud/etc.) — machine-specific, shared with intake-tool
+backend/backup_config.json

@@ -1,5 +1,7 @@
 'use strict';
 
+import { escapeHtml } from './utils.js';
+
 // ============================================================
 // GLOBAL STATE
 // ============================================================
@@ -142,3 +144,63 @@ async function startup() {
 }
 
 startup();
+
+// ============================================================
+// BACKUP-ON-CLOSE PROGRESS OVERLAY
+// ============================================================
+// Port από intake-tool/js/backup.js — ζει εδώ (όχι σε page module) γιατί το backup-on-close
+// μπορεί να ενεργοποιηθεί ανεξάρτητα από ποια σελίδα είναι ανοιχτή τη στιγμή του κλεισίματος.
+if (window.api?.onBackupProgress) {
+  const bar = document.getElementById('bk-progress');
+  const icon = document.getElementById('bk-progress-icon');
+  const msg = document.getElementById('bk-progress-msg');
+  const timerEl = document.getElementById('bk-progress-timer');
+  const breakdownEl = document.getElementById('bk-progress-breakdown');
+  const SLOW_THRESHOLD_SEC = 5;
+
+  let tickHandle = null;
+  let startedAt = null;
+
+  function stopTicking() {
+    if (tickHandle) { clearInterval(tickHandle); tickHandle = null; }
+  }
+
+  function fmtSec(s) {
+    return s >= 60 ? `${Math.floor(s / 60)}λ ${Math.round(s % 60)}δ` : `${s.toFixed(1)}δ`;
+  }
+
+  window.api.onBackupProgress((status, data) => {
+    bar.style.display = 'flex';
+    if (status === 'start') {
+      icon.textContent = '💾';
+      msg.textContent = 'Γίνεται αντίγραφο ασφαλείας... παρακαλώ περιμένετε.';
+      breakdownEl.textContent = '';
+      startedAt = Date.now();
+      stopTicking();
+      timerEl.textContent = '0.0δ';
+      tickHandle = setInterval(() => {
+        timerEl.textContent = fmtSec((Date.now() - startedAt) / 1000);
+      }, 100);
+    } else if (status === 'done') {
+      stopTicking();
+      icon.textContent = '✅';
+      msg.textContent = 'Το αντίγραφο ολοκληρώθηκε.';
+      const total = data?.total_elapsed_sec ?? (startedAt ? (Date.now() - startedAt) / 1000 : null);
+      timerEl.textContent = total != null ? fmtSec(total) : '';
+      const results = data?.results || [];
+      breakdownEl.innerHTML = results.map(r => {
+        const sec = r.elapsed_sec ?? 0;
+        const slow = sec >= SLOW_THRESHOLD_SEC;
+        const label = r.skipped ? 'παραλείφθηκε (καμία αλλαγή)' : fmtSec(sec) + (slow ? ' — αργό' : '');
+        return `<div${slow ? ' style="color:#ffb703;"' : ''}>${escapeHtml(r.folder)}: ${label}</div>`;
+      }).join('');
+    } else if (status === 'error') {
+      stopTicking();
+      icon.textContent = '⚠️';
+      msg.textContent = 'Το αντίγραφο απέτυχε — κλείσιμο εφαρμογής.';
+      const total = startedAt ? (Date.now() - startedAt) / 1000 : null;
+      timerEl.textContent = total != null ? fmtSec(total) : '';
+      breakdownEl.textContent = data?.error ? escapeHtml(data.error) : '';
+    }
+  });
+}

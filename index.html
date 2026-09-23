@@ -38,6 +38,14 @@
 <!-- TOASTS -->
 <div id="toast-container" style="position:fixed; top:48px; right:20px; z-index:500; display:flex; flex-direction:column; gap:8px;"></div>
 
+<!-- BACKUP-ON-CLOSE PROGRESS -->
+<div id="bk-progress" style="display:none; position:fixed; inset:0; z-index:600; background:rgba(15,32,64,0.85); align-items:center; justify-content:center; flex-direction:column; color:#fff;">
+  <div id="bk-progress-icon" style="font-size:40px; margin-bottom:12px;">💾</div>
+  <div id="bk-progress-msg" style="font-size:15px;"></div>
+  <div id="bk-progress-timer" style="font-size:22px; font-variant-numeric:tabular-nums; margin-top:8px; opacity:0.9;"></div>
+  <div id="bk-progress-breakdown" style="font-size:12px; margin-top:10px; opacity:0.8; text-align:center;"></div>
+</div>
+
 <!-- CONFIRM MODAL -->
 <div class="modal-overlay" id="confirm-modal">
   <div class="modal" style="max-width:420px;">

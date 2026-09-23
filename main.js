@@ -100,7 +100,7 @@ function startBridge() {
   });
 }
 
-function callPython(cmd, payload = {}) {
+function callPython(cmd, payload = {}, timeoutMs = 120000) {
   return new Promise((resolve, reject) => {
     const id = ++reqCounter;
     pendingRequests[id] = { resolve, reject };
@@ -112,9 +112,13 @@ function callPython(cmd, payload = {}) {
         delete pendingRequests[id];
         reject(new Error(`Timeout: ${cmd}`));
       }
-    }, 120000);
+    }, timeoutMs);
   });
 }
+
+// Το backup μπορεί να αργήσει πολύ περισσότερο από το τυπικό 120s όριο σε αργό
+// cloud remote (βλ. backend/backup.py) — ίδιο μοτίβο με το intake-tool.
+const RUN_BACKUP_TIMEOUT_MS = 45 * 60 * 1000; // 45 λεπτά
 
 // Πρέπει να μείνει συγχρονισμένο με τη λίστα `if cmd == '...'` του backend/bridge.py —
 // αν προστεθεί νέα εντολή εκεί, πρέπει να προστεθεί και εδώ αλλιώς αποτυγχάνει σιωπηλά.
@@ -136,6 +140,7 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'review_flagged_invoice', 'unreview_flagged_invoice',
   'update_invoice_from_data', 'delete_invoice_item', 'split_invoice_item',
   'expvault_export_preview', 'expvault_export_write',
+  'get_backup_config', 'run_backup',
   'list_open_bulk_pools', 'add_allocation', 'close_bulk_pool', 'delete_bulk_pool',
   'get_summary',
 ]);
@@ -146,7 +151,8 @@ function setupIPC() {
       return { ok: false, error: `Άγνωστη εντολή: ${cmd}` };
     }
     try {
-      return { ok: true, result: await callPython(cmd, payload) };
+      const timeoutMs = cmd === 'run_backup' ? RUN_BACKUP_TIMEOUT_MS : undefined;
+      return { ok: true, result: await callPython(cmd, payload, timeoutMs) };
     } catch (e) {
       return { ok: false, error: e.message };
     }
@@ -211,6 +217,41 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
   mainWindow.once('ready-to-show', () => mainWindow.show());
+
+  // Port από intake-tool/main.js — backup-on-close. preventDefault() ΠΑΝΤΑ πρώτο πράγμα,
+  // synchronously: το 'close' event του Electron είναι synchronous — αν δεν καλέσεις
+  // preventDefault() πριν επιστρέψει ο handler (πριν από οποιοδήποτε await), το Electron
+  // προχωράει στο default close αμέσως, αγνοώντας τελείως το async backup logic που
+  // ακολουθεί (ήδη διορθωμένο bug στο intake-tool, μην το ξαναγράψεις διαφορετικά).
+  let _closeInProgress = false;
+  mainWindow.on('close', (e) => {
+    if (_closeInProgress) return;
+    e.preventDefault();
+
+    (async () => {
+      let hasPaths = false;
+      try {
+        const cfg = await callPython('get_backup_config');
+        hasPaths = Array.isArray(cfg?.paths) && cfg.paths.some(p => p);
+      } catch {}
+
+      if (hasPaths) {
+        mainWindow.webContents.send('backup-progress', 'start');
+        try {
+          const result = await callPython('run_backup', {}, RUN_BACKUP_TIMEOUT_MS);
+          mainWindow.webContents.send('backup-progress', 'done', result);
+        } catch (err) {
+          console.error('[Backup] Error on close:', err.message);
+          mainWindow.webContents.send('backup-progress', 'error', { error: err.message });
+        }
+        await new Promise(r => setTimeout(r, 900));
+      }
+
+      _closeInProgress = true;
+      mainWindow.close();
+    })();
+  });
+
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
