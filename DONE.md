@@ -3,6 +3,33 @@
 Ό,τι έχει ολοκληρωθεί από τη λίστα εργασιών του project Γαλάτιστας. Βλ.
 `TODO.md` για ό,τι μένει. Ίδιο αρχείο και στα 3 repos.
 
+## [intake-tool/invoicebook] Εργαλείο ορφανών μηχανημάτων (2026-09-23)
+
+Έκλεισε το κενό που εντοπίστηκε 2026-09-19 (χειροκίνητη διαγραφή `ATLAS COPCO 1238`): το
+`merge_machines()` διέγραφε ήδη το δικό του `merge_id`, αλλά κανένας άλλος δρόμος
+(διόρθωση λάθος `machine_id`, διαγραφή τιμολογίου/γραμμής, split-tool) δεν καθάριζε
+μηχανήματα που έμεναν με 0 χρήσεις.
+
+- **`invoices/backend/database.py`**: `get_orphan_machines()` (0 γραμμές σε
+  `tbl_invoice_items` ΚΑΙ 0 σε `tbl_allocations` — τα ίδια 2 FK με το `merge_machines`) +
+  `delete_orphan_machines(ids)`, που ξαναελέγχει την ορφανότητα μέσα στο ίδιο το DELETE
+  (ένα μηχάνημα που απέκτησε χρήση μετά τη φόρτωση της λίστας παραλείπεται, επιστρέφει
+  `{deleted, skipped}`).
+- **Wiring**: και τα 2 `bridge.py` + και τα 2 `main.js`'s `ALLOWED_PYTHON_COMMANDS`.
+- **UI, και στα δύο apps** (ισοτιμία με τη μεταφορά λειτουργιών προς invoicebook): νέα
+  κάρτα στο intake-tool tab «🧹 Καθαρισμός» και στο invoicebook «Συγχωνεύσεις →
+  ΜΗΧΑΝΗΜΑΤΑ». Λίστα με checkbox ανά μηχάνημα (όλα επιλεγμένα) + στήλη Σημείωση (για να
+  κρατηθεί σκόπιμα κάποιο), κουμπί «Διαγραφή επιλεγμένων (N)» με `confirm()`, ξαναφόρτωση
+  μετά από κάθε merge μηχανημάτων. On-demand σάρωση, όχι αυτόματο trigger.
+- **Δοκιμή**: (a) backend σε πεταχτό αντίγραφο βάσης — ορφανά βρέθηκαν, χρησιμοποιούμενο
+  id και μηχάνημα-μόνο-με-allocation (τεχνητό bulk pool) σωστά παραλείφθηκαν (`skipped`),
+  κενή λίστα ids OK. (b) Πλήρες UI intake-tool μέσω Playwright με `INVOICES_DB_PATH` σε
+  αντίγραφο + άδειο `INTAKE_TOOL_DATA_DIR` (κανένα backup-on-close): 3 ορφανά,
+  αποεπιλογή του ενός με σημείωση, διαγραφή των 2, έμεινε μόνο αυτό, 0 console errors.
+  (c) invoicebook: μόνο read-only (κενή λίστα «Κανένα ορφανό μηχάνημα», 0 errors) — δεν
+  υποστηρίζει override βάσης σε dev mode (βλ. TODO.md). Πραγματική βάση ανέγγιχτη (ίδιο
+  md5 πριν/μετά)· σήμερα έχει 0 ορφανά από 35 μηχανήματα.
+
 ## [Cross-repo] Two-machine split: προετοιμασία coding PC + 2 backup bugs (2026-09-19 → 2026-09-23)
 
 Ξεκίνησε 2026-09-19 (commit `5ccbdc0`, `invoices/scripts/transfer-to-external-drive.ps1`)

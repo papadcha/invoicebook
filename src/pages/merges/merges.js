@@ -8,7 +8,7 @@ document.querySelectorAll('.subtab[data-subtab]').forEach(btn => btn.addEventLis
   document.querySelectorAll('.subtab[data-subtab]').forEach(b => b.classList.toggle('active', b === btn));
   document.querySelectorAll('.subtab-panel').forEach(p => p.style.display = (p.id === `panel-${tab}` ? '' : 'none'));
   if (tab === 'suppliers' && !loaded.suppliers) { loaded.suppliers = true; loadSupplierCandidates(); }
-  if (tab === 'machines' && !loaded.machines) { loaded.machines = true; loadMachineCandidates(); }
+  if (tab === 'machines' && !loaded.machines) { loaded.machines = true; loadMachineCandidates(); loadOrphanMachines(); }
   if (tab === 'descriptions' && !loaded.descriptions) { loaded.descriptions = true; loadDescriptionCandidates(); }
 }));
 
@@ -167,7 +167,7 @@ async function loadMachineCandidates() {
     const r = rows[parseInt(btn.dataset.preview, 10)];
     openMergePreviewModal({
       kind: 'machine', keep: r.keep_name, merge: r.name,
-      keepId: r.keep_id, mergeId: r.id, onDone: loadMachineCandidates,
+      keepId: r.keep_id, mergeId: r.id, onDone: () => { loadMachineCandidates(); loadOrphanMachines(); },
     });
   }));
   el.querySelectorAll('[data-dismiss]').forEach(btn => btn.addEventListener('click', async () => {
@@ -195,9 +195,57 @@ document.getElementById('machine-manual-btn').addEventListener('click', () => {
   if (keep.id === merge.id) { App.toast('Ίδιο μηχάνημα και στα δύο πεδία', 'fail'); return; }
   openMergePreviewModal({
     kind: 'machine', keep: keep.name, merge: merge.name, keepId: keep.id, mergeId: merge.id,
-    onDone: loadMachineCandidates,
+    onDone: () => { loadMachineCandidates(); loadOrphanMachines(); },
   });
 });
+
+async function loadOrphanMachines() {
+  const el = document.getElementById('orphan-machines-list');
+  el.innerHTML = '<p class="muted-sm">Φόρτωση…</p>';
+  const orphans = await pyCall('get_orphan_machines') || [];
+  if (!orphans.length) { el.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>Κανένα ορφανό μηχάνημα.</p></div>'; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th style="width:32px;"><input type="checkbox" id="orphan-machine-all" checked></th><th>Μηχάνημα</th><th>Σημείωση</th></tr></thead>
+    <tbody>${orphans.map(m => `
+      <tr>
+        <td><input type="checkbox" class="orphan-machine-cb" value="${m.id}" checked></td>
+        <td>${escapeHtml(m.name)}</td>
+        <td class="muted-sm">${escapeHtml(m.notes || '—')}</td>
+      </tr>`).join('')}</tbody></table></div>
+    <div class="form-actions"><button type="button" class="btn btn-danger" id="orphan-machine-delete-btn"></button></div>`;
+
+  const btn = document.getElementById('orphan-machine-delete-btn');
+  const boxes = [...el.querySelectorAll('.orphan-machine-cb')];
+  const selectedIds = () => boxes.filter(b => b.checked).map(b => parseInt(b.value, 10));
+  const refreshBtn = () => {
+    const n = selectedIds().length;
+    btn.textContent = `Διαγραφή επιλεγμένων (${n})`;
+    btn.disabled = n === 0;
+  };
+  refreshBtn();
+
+  document.getElementById('orphan-machine-all').addEventListener('change', e => {
+    boxes.forEach(b => { b.checked = e.target.checked; });
+    refreshBtn();
+  });
+  boxes.forEach(b => b.addEventListener('change', refreshBtn));
+
+  btn.addEventListener('click', async () => {
+    const ids = selectedIds();
+    if (!confirm(`Οριστική διαγραφή ${ids.length} ορφανού/ών μηχανήματος/ων;`)) return;
+    const unlock = _lock(btn);
+    try {
+      const result = await pyCallStrict('delete_orphan_machines', { ids });
+      const skippedText = result.skipped ? ` (${result.skipped} παραλείφθηκαν — απέκτησαν χρήση εν τω μεταξύ)` : '';
+      App.toast(`Διαγράφηκαν ${result.deleted} μηχάνημα/τα${skippedText}`, 'ok');
+      window.reloadLookups();
+      loadOrphanMachines();
+    } catch (e) {
+      App.toast(e.message, 'fail');
+      unlock();
+    }
+  });
+}
 
 // ── ΠΕΡΙΓΡΑΦΕΣ ───────────────────────────────────────────────────────────────
 async function loadDescriptionCandidates() {

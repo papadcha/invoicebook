@@ -169,6 +169,12 @@ def handle(cmd, payload):
     if cmd == 'merge_machines':
         return database.merge_machines(_int_id(payload, 'keep_id'), _int_id(payload, 'merge_id'))
 
+    if cmd == 'get_orphan_machines':
+        return database.get_orphan_machines()
+
+    if cmd == 'delete_orphan_machines':
+        return database.delete_orphan_machines(payload['ids'])
+
     if cmd == 'dismiss_merge_candidate':
         database.dismiss_merge_candidate(payload['kind'], payload['candidate_key'])
         return {'ok': True}

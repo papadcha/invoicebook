@@ -881,6 +881,41 @@ def merge_machines(keep_id, merge_id):
     return {'reassigned_items': cur1.rowcount, 'reassigned_allocations': cur2.rowcount}
 
 
+# Ορφανό = καμία αναφορά από ΚΑΝΕΝΑ από τα δύο FK (ίδια δύο με το merge_machines
+# παραπάνω). Το merge_machines ήδη διαγράφει το δικό του merge_id -- αυτό καλύπτει
+# όλους τους ΑΛΛΟΥΣ δρόμους που αφήνουν μηχάνημα με 0 χρήσεις (χειροκίνητη διόρθωση
+# machine_id, διαγραφή τιμολογίου/γραμμής, split-tool).
+_ORPHAN_MACHINE_WHERE = (
+    'NOT EXISTS (SELECT 1 FROM tbl_invoice_items ii WHERE ii.machine_id = m.id) '
+    'AND NOT EXISTS (SELECT 1 FROM tbl_allocations a WHERE a.machine_id = m.id)'
+)
+
+
+def get_orphan_machines():
+    with get_db() as conn:
+        rows = conn.execute(
+            f'SELECT m.id, m.name, m.notes FROM tbl_machines m WHERE {_ORPHAN_MACHINE_WHERE} ORDER BY m.name'
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def delete_orphan_machines(ids):
+    """Διαγράφει ΜΟΝΟ όσα από τα ids είναι ακόμα ορφανά τη στιγμή της διαγραφής --
+    ο έλεγχος ξαναγίνεται μέσα στο ίδιο DELETE, ώστε ένα μηχάνημα που απέκτησε
+    γραμμή μετά τη φόρτωση της λίστας (π.χ. από άλλο παράθυρο) να μη χαθεί."""
+    ids = [int(i) for i in ids]
+    if not ids:
+        return {'deleted': 0, 'skipped': 0}
+    placeholders = ','.join('?' * len(ids))
+    with get_db() as conn:
+        cur = conn.execute(
+            f'DELETE FROM tbl_machines WHERE id IN ({placeholders}) AND id IN '
+            f'(SELECT m.id FROM tbl_machines m WHERE {_ORPHAN_MACHINE_WHERE})',
+            ids
+        )
+    return {'deleted': cur.rowcount, 'skipped': len(ids) - cur.rowcount}
+
+
 # ── ΕΙΣΑΓΩΓΗ (STAGING) ────────────────────────────────────────────────────────
 
 def _resolve_header(conn, data):
