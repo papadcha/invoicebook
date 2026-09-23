@@ -232,7 +232,7 @@ async function loadOrphanMachines() {
 
   btn.addEventListener('click', async () => {
     const ids = selectedIds();
-    if (!confirm(`Οριστική διαγραφή ${ids.length} ορφανού/ών μηχανήματος/ων;`)) return;
+    if (!(await App.confirmAsync(`Οριστική διαγραφή ${ids.length} ορφανού/ών μηχανήματος/ων;`))) return;
     const unlock = _lock(btn);
     try {
       const result = await pyCallStrict('delete_orphan_machines', { ids });

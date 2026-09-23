@@ -113,6 +113,13 @@ window.App = {
     document.getElementById('confirm-ok-btn').onclick = () => { App.closeConfirm(); onOk(); };
     document.getElementById('confirm-cancel-btn').onclick = () => { App.closeConfirm(); if (onCancel) onCancel(); };
   },
+  // Promise εκδοχή του confirmDelete — αντικαθιστά το native window.confirm(), που σε
+  // Electron/Windows δεν επιστρέφει το keyboard focus στη σελίδα μετά το κλείσιμό του
+  // (κανένα input δεν δέχεται πληκτρολόγηση μέχρι Alt+Tab). Μην ξαναχρησιμοποιήσεις
+  // confirm()/alert() σε αυτό το app.
+  confirmAsync(msg) {
+    return new Promise(resolve => App.confirmDelete(msg, () => resolve(true), () => resolve(false)));
+  },
 };
 
 // ============================================================
