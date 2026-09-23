@@ -186,3 +186,28 @@
     </div>
   </div>
 </div>
+
+<!-- Τελευταίο modal σκόπιμα -- ανοίγει ΠΑΝΩ από το ήδη ανοιχτό edit-invoice-modal
+     (nested modal), και σε αυτό το CSS (καμία z-index διαφοροποίηση μεταξύ
+     .modal-overlay) η σειρά στο DOM καθορίζει ποιο "νικάει" τα pointer events. -->
+<div class="modal-overlay" id="split-item-modal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-title">Διάσπαση Γραμμής σε Πολλά Μηχανήματα</div>
+    <input type="hidden" id="split-item-id">
+    <p class="muted-sm" style="margin-bottom:10px;">
+      Αρχική γραμμή: <span id="split-item-desc"></span> —
+      ποσότητα <strong id="split-item-orig-qty"></strong>,
+      αξία <strong id="split-item-orig-val"></strong>€
+    </p>
+    <div id="split-rows"></div>
+    <button type="button" class="btn btn-outline btn-sm" id="split-add-row-btn" style="margin-top:8px;">+ Πρόσθεσε μηχάνημα</button>
+    <p class="muted-sm" style="margin-top:12px;">
+      Άθροισμα: ποσότητα <span id="split-sum-qty"></span>, αξία <span id="split-sum-val"></span>€
+      <span id="split-sum-mismatch" style="color:var(--danger); font-weight:600; display:none;"> — δεν ταιριάζει με την αρχική γραμμή</span>
+    </p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="split-item-cancel-btn">Άκυρο</button>
+      <button class="btn btn-primary" id="split-item-ok-btn" disabled>Διάσπαση</button>
+    </div>
+  </div>
+</div>

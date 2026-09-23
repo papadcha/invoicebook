@@ -357,6 +357,7 @@ document.getElementById('edit-supplier-vat').addEventListener('input', refreshEd
 // εισάγεται στο update_invoice_from_data ως νέα, βλ. database.py).
 function editItemRowHtml(it) {
   const machineName = it.machine_id ? ((window.AppState.machines || []).find(m => m.id === it.machine_id) || {}).name || '' : '';
+  const splitBtn = it.id ? `<span class="items-remove-btn" data-split-row-btn title="Διάσπαση σε πολλά μηχανήματα" style="color:var(--navy3); margin-right:8px;">⑃</span>` : '';
   return `
     <tr data-item-row data-item-id="${it.id ?? ''}">
       <td><input type="text" data-f="description" value="${escapeHtml(it.description || '')}"></td>
@@ -368,7 +369,7 @@ function editItemRowHtml(it) {
       <td><input type="number" step="0.1" data-f="vat_pct" value="${it.vat_pct ?? ''}" style="width:64px;"></td>
       <td><input type="text" data-f="machine_name" value="${escapeHtml(machineName)}"></td>
       <td style="text-align:center;"><input type="checkbox" data-f="efk_eligible" ${it.efk_eligible ? 'checked' : ''} style="width:auto;"></td>
-      <td><span class="items-remove-btn" data-remove-row title="Διαγραφή γραμμής">✕</span></td>
+      <td>${splitBtn}<span class="items-remove-btn" data-remove-row title="Διαγραφή γραμμής">✕</span></td>
     </tr>
   `;
 }
@@ -384,6 +385,11 @@ attachAutocomplete(document.getElementById('edit-items-body'), '[data-f="machine
 // Event delegation στο tbody (μία φορά, στο module-load) — αν ξαναγραφόταν σε
 // κάθε render/προσθήκη γραμμής θα κολλούσαν διπλά listeners στις ήδη υπάρχουσες.
 document.getElementById('edit-items-body').addEventListener('click', (e) => {
+  const splitBtn = e.target.closest('[data-split-row-btn]');
+  if (splitBtn) {
+    openSplitModal(splitBtn.closest('tr'));
+    return;
+  }
   const btn = e.target.closest('[data-remove-row]');
   if (!btn) return;
   const tr = btn.closest('tr');
@@ -398,6 +404,92 @@ document.getElementById('edit-items-body').addEventListener('click', (e) => {
       App.toast(err.message, 'fail');
     }
   });
+});
+
+// ── Διάσπαση γραμμής σε πολλά μηχανήματα ──────────────────────────────────────
+attachAutocomplete(document.getElementById('split-rows'), '.split-machine', () => (window.AppState.machines || []).map(m => m.name), { normalize: normalizeGreek });
+
+function splitRowHtml(machineName, quantity, value) {
+  return `
+    <div data-split-row style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+      <input type="text" class="split-machine" placeholder="Μηχάνημα" value="${escapeHtml(machineName || '')}" style="flex:2;">
+      <input type="number" step="0.001" class="split-qty" placeholder="Ποσότητα" value="${quantity ?? ''}" style="width:100px;">
+      <input type="number" step="0.01" class="split-value" placeholder="Αξία" value="${value ?? ''}" style="width:100px;">
+      <span class="items-remove-btn" data-split-remove title="Αφαίρεση">✕</span>
+    </div>`;
+}
+
+function recomputeSplitSums() {
+  const rows = Array.from(document.querySelectorAll('#split-rows [data-split-row]'));
+  const qty = rows.reduce((s, r) => s + (parseFloat(r.querySelector('.split-qty').value) || 0), 0);
+  const val = rows.reduce((s, r) => s + (parseFloat(r.querySelector('.split-value').value) || 0), 0);
+  document.getElementById('split-sum-qty').textContent = qty;
+  document.getElementById('split-sum-val').textContent = val.toFixed(2);
+  const origQty = parseFloat(document.getElementById('split-item-orig-qty').textContent) || 0;
+  const origVal = parseFloat(document.getElementById('split-item-orig-val').textContent) || 0;
+  const matches = rows.length >= 2 && Math.abs(qty - origQty) < 0.001 && Math.abs(val - origVal) < 0.01;
+  document.getElementById('split-sum-mismatch').style.display = matches ? 'none' : '';
+  document.getElementById('split-item-ok-btn').disabled = !matches;
+}
+
+document.getElementById('split-rows').addEventListener('input', recomputeSplitSums);
+document.getElementById('split-rows').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-split-remove]');
+  if (!btn) return;
+  btn.closest('[data-split-row]').remove();
+  recomputeSplitSums();
+});
+
+document.getElementById('split-add-row-btn').addEventListener('click', () => {
+  document.getElementById('split-rows').insertAdjacentHTML('beforeend', splitRowHtml('', '', ''));
+  recomputeSplitSums();
+});
+
+function openSplitModal(tr) {
+  const itemId = tr.dataset.itemId;
+  const description = tr.querySelector('[data-f="description"]').value;
+  const quantity = parseFloat(tr.querySelector('[data-f="quantity"]').value) || 0;
+  const value = parseFloat(tr.querySelector('[data-f="value"]').value) || 0;
+  const machineName = tr.querySelector('[data-f="machine_name"]').value;
+
+  document.getElementById('split-item-id').value = itemId;
+  document.getElementById('split-item-desc').textContent = description;
+  document.getElementById('split-item-orig-qty').textContent = quantity;
+  document.getElementById('split-item-orig-val').textContent = value.toFixed(2);
+
+  const half = Math.round((quantity / 2) * 1000) / 1000;
+  const halfVal = Math.round((value / 2) * 100) / 100;
+  document.getElementById('split-rows').innerHTML =
+    splitRowHtml(machineName, half, halfVal) +
+    splitRowHtml('', quantity - half, value - halfVal);
+  recomputeSplitSums();
+  document.getElementById('split-item-modal').classList.add('open');
+}
+
+document.getElementById('split-item-cancel-btn').addEventListener('click', () => {
+  document.getElementById('split-item-modal').classList.remove('open');
+});
+
+document.getElementById('split-item-ok-btn').addEventListener('click', async () => {
+  const itemId = parseInt(document.getElementById('split-item-id').value, 10);
+  const rows = Array.from(document.querySelectorAll('#split-rows [data-split-row]'));
+  const splits = rows.map(r => ({
+    machine_name: r.querySelector('.split-machine').value.trim() || null,
+    quantity: parseFloat(r.querySelector('.split-qty').value),
+    value: parseFloat(r.querySelector('.split-value').value),
+  }));
+  const unlock = _lock(document.getElementById('split-item-ok-btn'));
+  try {
+    await pyCallStrict('split_invoice_item', { item_id: itemId, splits });
+    document.getElementById('split-item-modal').classList.remove('open');
+    App.toast('Η γραμμή διασπάστηκε', 'ok');
+    const invoiceId = parseInt(document.getElementById('edit-invoice-id').value, 10);
+    await openEditInvoice(invoiceId);
+  } catch (e) {
+    App.toast(e.message, 'fail');
+  } finally {
+    unlock();
+  }
 });
 
 document.getElementById('edit-add-item-btn').addEventListener('click', () => {

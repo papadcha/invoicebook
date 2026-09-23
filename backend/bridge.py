@@ -221,6 +221,9 @@ def handle(cmd, payload):
         database.delete_invoice_item(_int_id(payload, 'item_id'))
         return {'ok': True}
 
+    if cmd == 'split_invoice_item':
+        return database.split_invoice_item(_int_id(payload, 'item_id'), payload['splits'])
+
     # ── ΑΠΟΘΕΜΑΤΑ ΠΡΟΣ ΔΙΑΜΟΙΡΑΣΜΟ ────────────────────────────────────────────
     if cmd == 'list_open_bulk_pools':
         return database.list_open_bulk_pools()
