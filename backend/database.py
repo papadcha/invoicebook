@@ -770,6 +770,8 @@ def attach_pdf(invoice_id, source_path):
         dest_path = os.path.join(PDF_STORE_DIR, filename)
         counter = 2
         # Το παλιό αρχείο του ΙΔΙΟΥ τιμολογίου δεν είναι σύγκρουση -- αντικαθίσταται.
+        # (Μια πηγή που ήταν ήδη στο canonical όνομά της -- π.χ. ορφανό PDF, 2026-09-21 --
+        # βρίσκεται πλέον στο tmp_path, οπότε δεν «πιάνει» το όνομα ούτε αυτή.)
         while os.path.exists(dest_path) and not (
                 old_path and not old_used_by_other and _same_path(dest_path, old_path)):
             dest_path = os.path.join(PDF_STORE_DIR, f'{stem} ({counter}){ext}')
