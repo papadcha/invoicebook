@@ -129,6 +129,7 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'get_description_merge_candidates', 'merge_item_descriptions',
   'get_machine_merge_candidates', 'get_machine_merge_preview', 'merge_machines',
   'get_orphan_machines', 'delete_orphan_machines', 'get_single_supplier_plate_machines',
+  'get_unit_variants', 'merge_units',
   'get_pdf_store_report', 'delete_orphan_pdfs', 'find_invoices_with_same_pdf',
   'dismiss_merge_candidate',
   'get_summary',

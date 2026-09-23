@@ -177,6 +177,12 @@ def handle(cmd, payload):
     if cmd == 'get_single_supplier_plate_machines':
         return database.get_single_supplier_plate_machines()
 
+    if cmd == 'get_unit_variants':
+        return database.get_unit_variants()
+
+    if cmd == 'merge_units':
+        return database.merge_units(payload['from_unit'], payload['to_unit'])
+
     if cmd == 'get_pdf_store_report':
         return database.get_pdf_store_report()
 

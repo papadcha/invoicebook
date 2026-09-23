@@ -471,7 +471,7 @@ def _insert_invoice(conn, header, items):
                (invoice_id, code, description, unit, quantity, unit_price, value, vat_pct,
                 category, machine_id, efk_eligible)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (invoice_id, it.get('code'), it.get('description') or '', it.get('unit'),
+            (invoice_id, it.get('code'), it.get('description') or '', canonical_unit(it.get('unit')),
              it.get('quantity'), it.get('unit_price'), it.get('value'), it.get('vat_pct'),
              it.get('category'), it.get('machine_id'), bool(it.get('efk_eligible')))
         )
@@ -530,7 +530,7 @@ def update_invoice(invoice_id, header, items=None):
                     '''UPDATE tbl_invoice_items SET code=?, description=?, unit=?, quantity=?,
                        unit_price=?, value=?, vat_pct=?, category=?, machine_id=?, efk_eligible=?
                        WHERE id=? AND invoice_id=?''',
-                    (it.get('code'), it.get('description') or '', it.get('unit'), it.get('quantity'),
+                    (it.get('code'), it.get('description') or '', canonical_unit(it.get('unit')), it.get('quantity'),
                      it.get('unit_price'), it.get('value'), it.get('vat_pct'), it.get('category'),
                      it.get('machine_id'), bool(it.get('efk_eligible')), item_id, invoice_id)
                 )
@@ -541,7 +541,7 @@ def update_invoice(invoice_id, header, items=None):
                        (invoice_id, code, description, unit, quantity, unit_price, value, vat_pct,
                         category, machine_id, efk_eligible)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                    (invoice_id, it.get('code'), it.get('description') or '', it.get('unit'),
+                    (invoice_id, it.get('code'), it.get('description') or '', canonical_unit(it.get('unit')),
                      it.get('quantity'), it.get('unit_price'), it.get('value'), it.get('vat_pct'),
                      it.get('category'), it.get('machine_id'), bool(it.get('efk_eligible')))
                 )
@@ -793,6 +793,85 @@ def attach_pdf(invoice_id, source_path):
     if old_filename and old_filename != stored_name:
         _remove_stored_pdf_if_unreferenced(old_filename)
     return stored_name
+
+
+# ── ΜΟΝΑΔΕΣ ΜΕΤΡΗΣΗΣ: κανονικό σύνολο + ενοποίηση παραλλαγών ──────────────────
+# Το IMPORT_PROMPT ζητάει μόνο L / kg / ΤΕΜ (ελληνικά) / m, αλλά στην πράξη μπήκαν και
+# οπτικά ίδιες παραλλαγές με διαφορετικούς χαρακτήρες (321 γραμμές «TEM» με λατινικά,
+# imports 29/8–15/9, «KG», «Μ» ελληνικό) — χωρίζουν κάθε άθροισμα/φίλτρο ανά μονάδα στα δύο.
+# canonical_unit() τρέχει σε ΚΑΘΕ εγγραφή γραμμής, ώστε να μην ξαναμπαίνουν· οι ήδη
+# υπάρχουσες ενοποιούνται από το εργαλείο «Μονάδες» (get_unit_variants/merge_units).
+CANONICAL_UNITS = ('L', 'kg', 'ΤΕΜ', 'm')
+
+# Κλειδί: κεφαλαία, χωρίς τόνους/τελείες/κενά, ελληνικά ομοιόμορφα → λατινικά (ίδιο
+# _GREEK_LATIN_HOMOGLYPHS με τα μηχανήματα), ώστε «ΤΕΜ»/«TEM»/«τεμ.» να δίνουν το ίδιο.
+_UNIT_ALIASES = {
+    'L': 'L', 'LT': 'L', 'LTR': 'L', 'LTRS': 'L', 'LITRE': 'L', 'LITER': 'L',
+    'ΛIT': 'L', 'ΛITPA': 'L', 'ΛITPO': 'L', 'ΛT': 'L',
+    'KG': 'kg', 'KGS': 'kg', 'KIΛ': 'kg', 'KIΛA': 'kg', 'KIΛO': 'kg', 'KΓ': 'kg',
+    'TEM': 'ΤΕΜ', 'TEMAXIA': 'ΤΕΜ', 'TEMAXIO': 'ΤΕΜ', 'TMX': 'ΤΕΜ', 'PCS': 'ΤΕΜ', 'PC': 'ΤΕΜ',
+    'M': 'm', 'MET': 'm', 'METP': 'm', 'METPA': 'm', 'METPO': 'm', 'MTP': 'm',
+}
+
+
+def _unit_key(unit):
+    u = unicodedata.normalize('NFD', unit or '')
+    u = ''.join(c for c in u if unicodedata.category(c) != 'Mn').upper()
+    return re.sub(r'[.\s]', '', u).translate(_GREEK_LATIN_HOMOGLYPHS)
+
+
+def canonical_unit(unit):
+    """Η κανονική μορφή μιας γνωστής παραλλαγής (TEM→ΤΕΜ, KG→kg, Μ→m)· άγνωστη μονάδα
+    (π.χ. m3) μένει όπως ήρθε, κενή → None."""
+    if unit is None or not str(unit).strip():
+        return None
+    unit = str(unit).strip()
+    if unit in CANONICAL_UNITS:
+        return unit
+    return _UNIT_ALIASES.get(_unit_key(unit), unit)
+
+
+def _unit_script(unit):
+    has_latin = bool(re.search(r'[A-Za-z]', unit))
+    has_greek = bool(re.search(r'[Α-Ωα-ωΆ-Ώά-ώ]', unit))
+    return 'μικτά' if has_latin and has_greek else 'λατινικά' if has_latin else 'ελληνικά' if has_greek else ''
+
+
+def get_unit_variants():
+    """Μονάδες εκτός του κανονικού συνόλου, με πλήθος γραμμών, προτεινόμενη κανονική
+    (αν είναι γνωστή παραλλαγή) και σε ποιες κατηγορίες εμφανίζονται. Όχι όσες έχουν
+    «Παράβλεψη» (kind 'unit', key = η ίδια η μονάδα)."""
+    dismissed = _load_dismissed_keys('unit')
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT unit, COUNT(*) AS n, GROUP_CONCAT(DISTINCT COALESCE(category, '—')) AS cats
+               FROM tbl_invoice_items WHERE unit IS NOT NULL AND TRIM(unit) <> ''
+               GROUP BY unit ORDER BY n DESC"""
+        ).fetchall()
+    out = []
+    for r in rows:
+        if r['unit'] in CANONICAL_UNITS or r['unit'] in dismissed:
+            continue
+        suggested = canonical_unit(r['unit'])
+        out.append({
+            'unit': r['unit'], 'count': r['n'], 'script': _unit_script(r['unit']),
+            'suggested': suggested if suggested in CANONICAL_UNITS else None,
+            'categories': (r['cats'] or '').split(','), 'dismiss_key': r['unit'],
+        })
+    return out
+
+
+def merge_units(from_unit, to_unit):
+    """Όλες οι γραμμές (και τα αποθέματα προς διαμοιρασμό) με μονάδα from_unit → to_unit.
+    Μόνο προς κανονική μονάδα — αλλιώς θα δημιουργούσε νέα παραλλαγή."""
+    if to_unit not in CANONICAL_UNITS:
+        raise ValueError(f'Η μονάδα-στόχος πρέπει να είναι μία από: {", ".join(CANONICAL_UNITS)}')
+    if from_unit == to_unit:
+        raise ValueError('Ίδια μονάδα')
+    with get_db() as conn:
+        items = conn.execute('UPDATE tbl_invoice_items SET unit=? WHERE unit=?', (to_unit, from_unit)).rowcount
+        pools = conn.execute('UPDATE tbl_bulk_pools SET unit=? WHERE unit=?', (to_unit, from_unit)).rowcount
+    return {'items': items, 'pools': pools}
 
 
 # ── ΙΣΤΟΡΙΚΟ ΕΞΑΓΩΓΩΝ προς εξωτερικά συστήματα (γενικό, target = σύστημα) ──────
@@ -1605,7 +1684,7 @@ def _create_bulk_pool(conn, invoice_item_id, item_data):
         '''INSERT INTO tbl_bulk_pools
            (invoice_item_id, category, unit, total_quantity, remaining_quantity, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)''',
-        (invoice_item_id, item_data.get('category'), item_data.get('unit'), total, total, now, now)
+        (invoice_item_id, item_data.get('category'), canonical_unit(item_data.get('unit')), total, total, now, now)
     )
 
 

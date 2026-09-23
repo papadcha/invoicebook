@@ -7,6 +7,7 @@
   <button class="subtab active" data-subtab="suppliers">ΠΡΟΜΗΘΕΥΤΕΣ</button>
   <button class="subtab" data-subtab="machines">ΜΗΧΑΝΗΜΑΤΑ</button>
   <button class="subtab" data-subtab="descriptions">ΠΕΡΙΓΡΑΦΕΣ</button>
+  <button class="subtab" data-subtab="units">ΜΟΝΑΔΕΣ</button>
   <button class="subtab" data-subtab="pdfs">ΑΡΧΕΙΑ PDF</button>
 </div>
 
@@ -90,6 +91,19 @@
       η πιο συχνή γραφή προτείνεται ως η «σωστή». Ξαναγράφει description σε γραμμές τιμολογίων, καμία διαγραφή γραμμής.
     </p>
     <div id="description-candidates-list"></div>
+  </div>
+</div>
+
+<!-- ── ΜΟΝΑΔΕΣ ── -->
+<div class="subtab-panel" id="panel-units" style="display:none;">
+  <div class="card">
+    <div class="card-title">Μονάδες μέτρησης</div>
+    <p class="muted-sm" style="margin-bottom:14px;">
+      Μονάδες εκτός του κανονικού συνόλου <b>L, kg, ΤΕΜ, m</b> — π.χ. «TEM» με λατινικά γράμματα, που φαίνεται ίδιο
+      με το «ΤΕΜ» αλλά χωρίζει κάθε άθροισμα/φίλτρο ανά μονάδα στα δύο. Οι γνωστές παραλλαγές έχουν ήδη προτεινόμενη
+      μονάδα· οι άγνωστες (π.χ. m3) θέλουν επιλογή ή «Παράβλεψη». Οι νέες καταχωρήσεις διορθώνονται πλέον αυτόματα.
+    </p>
+    <div id="unit-variants-list"></div>
   </div>
 </div>
 

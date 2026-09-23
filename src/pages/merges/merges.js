@@ -1,7 +1,7 @@
 import { escapeHtml, _lock, normalizeGreek, attachAutocomplete, fmtDate } from '../../../js/utils.js';
 
 // ── SUBTABS ──────────────────────────────────────────────────────────────────
-const loaded = { suppliers: false, machines: false, descriptions: false, pdfs: false };
+const loaded = { suppliers: false, machines: false, descriptions: false, units: false, pdfs: false };
 
 document.querySelectorAll('.subtab[data-subtab]').forEach(btn => btn.addEventListener('click', () => {
   const tab = btn.dataset.subtab;
@@ -10,6 +10,7 @@ document.querySelectorAll('.subtab[data-subtab]').forEach(btn => btn.addEventLis
   if (tab === 'suppliers' && !loaded.suppliers) { loaded.suppliers = true; loadSupplierCandidates(); }
   if (tab === 'machines' && !loaded.machines) { loaded.machines = true; loadMachineCandidates(); loadOrphanMachines(); loadPlateMachines(); }
   if (tab === 'descriptions' && !loaded.descriptions) { loaded.descriptions = true; loadDescriptionCandidates(); }
+  if (tab === 'units' && !loaded.units) { loaded.units = true; loadUnitVariants(); }
   if (tab === 'pdfs' && !loaded.pdfs) { loaded.pdfs = true; loadPdfReport(); }
 }));
 
@@ -199,6 +200,50 @@ document.getElementById('machine-manual-btn').addEventListener('click', () => {
     onDone: () => { loadMachineCandidates(); loadOrphanMachines(); },
   });
 });
+
+async function loadUnitVariants() {
+  const el = document.getElementById('unit-variants-list');
+  const rows = await pyCall('get_unit_variants') || [];
+  if (!rows.length) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>Όλες οι μονάδες είναι στο κανονικό σύνολο (L, kg, ΤΕΜ, m).</p></div>';
+    return;
+  }
+  const opts = sel => ['', 'L', 'kg', 'ΤΕΜ', 'm'].map(u => `<option value="${u}" ${u === sel ? 'selected' : ''}>${u || '— διάλεξε —'}</option>`).join('');
+  el.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Μονάδα</th><th>Γραμμές</th><th>Κατηγορίες</th><th>Να γίνει</th><th></th></tr></thead>
+    <tbody>${rows.map((r, i) => `
+      <tr>
+        <td><b class="mono">${escapeHtml(r.unit)}</b> ${r.script ? `<span class="muted-sm">(${escapeHtml(r.script)})</span>` : ''}</td>
+        <td>${r.count}</td>
+        <td class="muted-sm">${r.categories.map(escapeHtml).join(', ')}</td>
+        <td><select class="unit-target" data-i="${i}">${opts(r.suggested || '')}</select></td>
+        <td style="white-space:nowrap;">
+          <button type="button" class="btn btn-outline btn-sm" data-unit-merge="${i}">Ενοποίηση</button>
+          <button type="button" class="btn btn-outline btn-sm" data-unit-dismiss="${i}">Παράβλεψη</button>
+        </td>
+      </tr>`).join('')}</tbody></table></div>`;
+  el.querySelectorAll('[data-unit-merge]').forEach(btn => btn.addEventListener('click', async () => {
+    const i = parseInt(btn.dataset.unitMerge, 10);
+    const r = rows[i];
+    const to = el.querySelector(`.unit-target[data-i="${i}"]`).value;
+    if (!to) { App.toast('Διάλεξε σε ποια μονάδα να γίνει', 'fail'); return; }
+    if (!(await App.confirmAsync(`Όλες οι ${r.count} γραμμές με μονάδα «${r.unit}» θα γίνουν «${to}». Συνέχεια;`))) return;
+    const unlock = _lock(btn);
+    try {
+      const res = await pyCallStrict('merge_units', { from_unit: r.unit, to_unit: to });
+      App.toast(`Ενοποιήθηκαν ${res.items} γραμμές${res.pools ? ` και ${res.pools} αποθέματα` : ''}`, 'ok');
+      loadUnitVariants();
+    } catch (e) {
+      App.toast(e.message, 'fail');
+      unlock();
+    }
+  }));
+  el.querySelectorAll('[data-unit-dismiss]').forEach(btn => btn.addEventListener('click', async () => {
+    const r = rows[parseInt(btn.dataset.unitDismiss, 10)];
+    await pyCallStrict('dismiss_merge_candidate', { kind: 'unit', candidate_key: r.dismiss_key });
+    loadUnitVariants();
+  }));
+}
 
 async function loadPlateMachines() {
   const el = document.getElementById('plate-machines-list');
