@@ -22,7 +22,7 @@ _local_db_dir = os.path.dirname(os.path.abspath(__file__ + '/../database'))
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database', 'schema.sql')
 MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database')
 
-CURRENT_SCHEMA_VERSION = 5
+CURRENT_SCHEMA_VERSION = 6
 
 migration_files = {
     1: os.path.join(MIGRATIONS_DIR, 'migration_001_initial_schema.sql'),
@@ -30,6 +30,7 @@ migration_files = {
     3: os.path.join(MIGRATIONS_DIR, 'migration_003_invoice_reviews.sql'),
     4: os.path.join(MIGRATIONS_DIR, 'migration_004_dismissed_merge_candidates.sql'),
     5: os.path.join(MIGRATIONS_DIR, 'migration_005_pdf_hashes.sql'),
+    6: os.path.join(MIGRATIONS_DIR, 'migration_006_invoice_exports.sql'),
 }
 
 
@@ -792,6 +793,34 @@ def attach_pdf(invoice_id, source_path):
     if old_filename and old_filename != stored_name:
         _remove_stored_pdf_if_unreferenced(old_filename)
     return stored_name
+
+
+# ── ΙΣΤΟΡΙΚΟ ΕΞΑΓΩΓΩΝ προς εξωτερικά συστήματα (γενικό, target = σύστημα) ──────
+
+def record_invoice_exports(target, invoice_ids, file_name=None):
+    now = _now()
+    with get_db() as conn:
+        conn.executemany(
+            'INSERT INTO tbl_invoice_exports (invoice_id, target, exported_at, file_name) VALUES (?, ?, ?, ?)',
+            [(int(i), target, now, file_name) for i in invoice_ids]
+        )
+    return now
+
+
+def get_invoice_exports(target):
+    """{invoice_id: {'exported_at', 'file_name', 'count'}} -- η ΤΕΛΕΥΤΑΙΑ εξαγωγή κάθε
+    τιμολογίου προς το target, και πόσες φορές έχει εξαχθεί συνολικά."""
+    with get_db() as conn:
+        rows = conn.execute(
+            '''SELECT invoice_id, exported_at, file_name FROM tbl_invoice_exports
+               WHERE target=? ORDER BY exported_at, id''', (target,)
+        ).fetchall()
+    out = {}
+    for r in rows:
+        prev = out.get(r['invoice_id'], {'count': 0})
+        out[r['invoice_id']] = {'exported_at': r['exported_at'], 'file_name': r['file_name'],
+                                'count': prev['count'] + 1}
+    return out
 
 
 # ── ΑΡΧΕΙΑ PDF: ορφανά / χαμένα / ίδιο PDF σε πολλά τιμολόγια (Layer 1 dedup) ──

@@ -124,6 +124,17 @@ CREATE TABLE tbl_pdf_hashes (
   sha256 TEXT NOT NULL
 );
 
+-- Ιστορικό εξαγωγών τιμολογίων προς εξωτερικά συστήματα (target, π.χ. 'expvault') —
+-- ώστε μια εξαγωγή να ξέρει τι έχει ήδη στείλει. Βλ. migration_006_invoice_exports.sql.
+CREATE TABLE tbl_invoice_exports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_id INTEGER NOT NULL REFERENCES tbl_invoices(id) ON DELETE CASCADE,
+  target TEXT NOT NULL,
+  exported_at TEXT NOT NULL,
+  file_name TEXT
+);
+CREATE INDEX idx_invoice_exports_target ON tbl_invoice_exports(target, invoice_id);
+
 CREATE TABLE tbl_schema_version (
   version INTEGER NOT NULL,
   applied_at TEXT NOT NULL,
