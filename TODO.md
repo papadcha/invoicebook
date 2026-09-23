@@ -12,6 +12,11 @@
 `invoicebook.db` + `pdf_store` + `backup_config.json` (production) + το
 `restore-backup-config-from-drive.ps1`· launcher στο νέο PC είναι το `launch-portable.ps1`.
 
+- [ ] Στο νέο μηχάνημα: **πάντα** άνοιγμα μέσω `launch-portable.ps1` (`-App invoicebook`/
+      `-App report-tool` για τα άλλα δύο), ποτέ σκέτο `npm start` — χωρίς αυτό τα
+      προγράμματα πλέον αρνούνται να ξεκινήσουν (βλ. DONE.md 2026-09-23). Το
+      `setup-computer.ps1` κάνει clone μόνο invoices+intake-tool· το report-tool, αν
+      χρειαστεί εκεί, θέλει χειροκίνητο `git clone` + `npm install`.
 - [ ] Στο νέο μηχάνημα, μετά το `launch-portable.ps1`/restore του backup_config.json:
       ρύθμιση/επιβεβαίωση ότι το intake-tool εκεί κάνει backup-on-close προς τους
       **πραγματικούς** production προορισμούς (mega/pcloud/Z:, όχι `-dev`) — δεν έχει
@@ -292,13 +297,6 @@ id είναι ο κύριος τρόπος χρήσης). Από το αρχικ
       και στο supplier/description tool (χρειάζεται δικό του, πιο αργό, με-άνοιγμα-PDF βήμα).
       **2026-09-17**: το `ΕΦΥΡΙΑ`→`ΣΦΥΡΙΑ` και `ΟΛΗΝΤΥΡΙΟ`→`ΠΛΥΝΤΗΡΙΟ` merge (βλ. DONE.md) είναι
       ακριβώς αυτού του τύπου, έγιναν χειροκίνητα εν τω μεταξύ.
-- [ ] **Το invoicebook σε dev mode αγνοεί το `INVOICEBOOK_DATA_DIR`** (`invoices/main.js:19`:
-      `DATA_DIR = app.isPackaged ? userData : BACKEND_DIR`, το env var γράφεται ΜΟΝΟ προς το
-      bridge, δεν διαβάζεται) — άρα δεν μπορεί να δοκιμαστεί UI του invoicebook πάνω σε
-      πεταχτό αντίγραφο βάσης όπως το intake-tool (`INVOICES_DB_PATH`). Βρέθηκε 2026-09-23
-      κατά τη δοκιμή του εργαλείου ορφανών (βλ. DONE.md). Μικρή αλλαγή:
-      `process.env.INVOICEBOOK_DATA_DIR || (...)`.
-
 ## [Cross-repo] 3 ξεχωριστά Electron windows
 
 intake-tool / invoicebook / report-tool είναι 3 πλήρεις ανεξάρτητες

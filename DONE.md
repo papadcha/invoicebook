@@ -3,6 +3,36 @@
 Ό,τι έχει ολοκληρωθεί από τη λίστα εργασιών του project Γαλάτιστας. Βλ.
 `TODO.md` για ό,τι μένει. Ίδιο αρχείο και στα 3 repos.
 
+## [Cross-repo] Νέο PC: όλα τα προγράμματα στη βάση του δίσκου + καμία σιωπηλή κενή βάση (2026-09-23)
+
+Εντοπίστηκε κατά τη δοκιμή του εργαλείου ορφανών: στο νέο PC (φρέσκο `git clone`, η βάση
+δεν είναι στο git) μόνο το intake-tool μέσω `launch-portable.ps1` έβλεπε τη βάση του δίσκου.
+Το invoicebook αγνοούσε κάθε override σε dev mode (`DATA_DIR = BACKEND_DIR`), και σκέτο
+`npm start` σε οποιοδήποτε από τα δύο θα δημιουργούσε σιωπηλά **νέα άδεια βάση** μέσα στο
+repo (`initialize_database()`) — καταχωρήσεις σε λάθος αρχείο χωρίς καμία ένδειξη.
+
+1. **invoicebook σέβεται το `INVOICES_DB_PATH`** (ίδιο env var με intake-tool/report-tool):
+   `main.js` (`DB_PATH`, `PDF_STORE_DIR` δίπλα στη βάση, περνάει στο bridge) +
+   `backend/bridge.py`.
+2. **`launch-portable.ps1 -App intake-tool|invoicebook|report-tool`** (default intake-tool):
+   ίδιος εντοπισμός δίσκου από volume label, έλεγχος `package.json`/`node_modules` στο
+   repo του επιλεγμένου app, `npm start` εκεί.
+3. **Βάση που λείπει → παράθυρο σφάλματος + έξοδος, όχι νέα κενή** (`missingDbError()` και
+   στα δύο `main.js`, πριν ξεκινήσει το bridge). invoicebook: ισχύει όταν δόθηκε
+   `INVOICES_DB_PATH` ή σε unpackaged run — η packaged πρώτη εκκίνηση (userData) ξεκινάει
+   κενή νόμιμα. intake-tool: πάντα (δεν γίνεται ποτέ packaged). Παράκαμψη:
+   `INVOICEBOOK_ALLOW_NEW_DB=1`. Το report-tool δεν χρειάστηκε αλλαγή — ανοίγει ήδη `mode=ro`,
+   που αποτυγχάνει αντί να δημιουργήσει αρχείο.
+
+**Δοκιμή**: invoicebook με `INVOICES_DB_PATH` σε αντίγραφο με 2 τεχνητά ορφανά → τα έδειξε
+και διέγραψε το επιλεγμένο (ολοκληρώνει και τη δοκιμή του εργαλείου ορφανών που πριν ήταν
+μόνο read-only). Βάση που λείπει: invoicebook και intake-tool → παράθυρο «Δεν βρέθηκε βάση»,
+κανένα αρχείο δεν δημιουργήθηκε, κανένα python process· με `INVOICEBOOK_ALLOW_NEW_DB=1` →
+δημιουργείται κανονικά. Κανονική εκκίνηση με υπαρκτή βάση → OK και στα δύο. Launcher: parse
+OK + dry-run και για τα 3 `-App` με προσομοιωμένο δίσκο (`subst` + stub `Get-Volume`/`npm`)
+→ σωστό cwd και `INVOICES_DB_PATH` κάθε φορά, άκυρο `-App` απορρίπτεται. Πραγματική βάση
+ανέγγιχτη (ίδιο md5).
+
 ## [intake-tool/invoicebook] Εργαλείο ορφανών μηχανημάτων (2026-09-23)
 
 Έκλεισε το κενό που εντοπίστηκε 2026-09-19 (χειροκίνητη διαγραφή `ATLAS COPCO 1238`): το

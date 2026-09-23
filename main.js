@@ -17,7 +17,26 @@ let queuedMessages = [];
 // unpackaged dev runs so it's easy to find/inspect/reset.
 const BACKEND_DIR = path.join(__dirname, 'backend');
 const DATA_DIR = app.isPackaged ? app.getPath('userData') : BACKEND_DIR;
-const PDF_STORE_DIR = path.join(DATA_DIR, 'pdf_store');
+// INVOICES_DB_PATH is the same override intake-tool and report-tool honour, so
+// one launcher (intake-tool's launch-portable.ps1) can point all three at the
+// same db, e.g. on the external drive. pdf_store always lives next to the db.
+const DB_PATH = process.env.INVOICES_DB_PATH || path.join(DATA_DIR, 'invoicebook.db');
+const PDF_STORE_DIR = path.join(path.dirname(DB_PATH), 'pdf_store');
+
+// A missing db is NOT silently created empty when an explicit path was given or
+// when running from the repo: on a fresh machine invoicebook.db doesn't come
+// with the git clone, and a new empty db would have the user entering invoices
+// into the wrong file without noticing. Only a packaged first run (userData)
+// legitimately starts empty. INVOICEBOOK_ALLOW_NEW_DB=1 to start one on purpose.
+function missingDbError() {
+  const mustExist = !!process.env.INVOICES_DB_PATH || !app.isPackaged;
+  if (!mustExist || process.env.INVOICEBOOK_ALLOW_NEW_DB === '1') return null;
+  if (fs.existsSync(DB_PATH) && fs.statSync(DB_PATH).size > 0) return null;
+  return `Δεν βρέθηκε η βάση τιμολογίων:\n\n${DB_PATH}\n\n` +
+    'Δεν δημιουργείται αυτόματα νέα κενή βάση. Αν τα δεδομένα είναι σε φορητό δίσκο, ' +
+    'ξεκίνα με το launch-portable.ps1 του intake-tool (-App invoicebook).\n' +
+    'Για σκόπιμα νέα βάση: INVOICEBOOK_ALLOW_NEW_DB=1.';
+}
 
 function getPythonPath() {
   return os.platform() === 'win32' ? 'python' : 'python3';
@@ -31,11 +50,12 @@ function startBridge() {
     ...process.env,
     PYTHONUNBUFFERED: '1',
     INVOICEBOOK_DATA_DIR: DATA_DIR,
+    INVOICES_DB_PATH: DB_PATH,
   };
 
   const cmd = getPythonPath();
   const args = [path.join(backendDir, 'bridge.py')];
-  console.log(`[Bridge] Starting: ${cmd} ${args[0]} (data dir: ${DATA_DIR})`);
+  console.log(`[Bridge] Starting: ${cmd} ${args[0]} (db: ${DB_PATH})`);
 
   pythonProcess = spawn(cmd, args, {
     cwd: backendDir,
@@ -182,6 +202,12 @@ function createWindow() {
 app.commandLine.appendSwitch('lang', 'el');
 
 app.whenReady().then(() => {
+  const dbError = missingDbError();
+  if (dbError) {
+    dialog.showErrorBox('Δεν βρέθηκε βάση', dbError);
+    app.quit();
+    return;
+  }
   setupIPC();
   startBridge();
   createWindow();
