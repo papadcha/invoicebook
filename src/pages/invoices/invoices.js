@@ -14,6 +14,9 @@ function setPdfUiIdle() {
 document.getElementById('pick-pdf-btn').addEventListener('click', async () => {
   const filePath = await window.api.pickPdfFile();
   if (!filePath) return;
+  if (currentStoredPdfFilename && !(await App.confirmAsync(
+    `Το τιμολόγιο έχει ήδη PDF («${currentStoredPdfFilename}»). Αντικατάσταση κατά την αποθήκευση; Το παλιό αρχείο θα σβηστεί.`
+  ))) return;
   pickedPdfSourcePath = filePath;
   document.getElementById('pdf-status').textContent = filePath.split(/[\\/]/).pop();
   document.getElementById('open-pdf-btn').style.display = 'none';
@@ -135,7 +138,7 @@ async function loadList() {
   );
   body.querySelectorAll('[data-del]').forEach(btn =>
     btn.addEventListener('click', () => {
-      App.confirmDelete('Διαγραφή αυτού του τιμολογίου;', async () => {
+      App.confirmDelete('Διαγραφή αυτού του τιμολογίου, μαζί με το αρχείο PDF του;', async () => {
         await pyCallStrict('delete_invoice', { id: parseInt(btn.dataset.del, 10) });
         App.toast('Το τιμολόγιο διαγράφηκε', 'ok');
         loadList();

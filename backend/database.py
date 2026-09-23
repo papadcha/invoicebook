@@ -22,13 +22,14 @@ _local_db_dir = os.path.dirname(os.path.abspath(__file__ + '/../database'))
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database', 'schema.sql')
 MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database')
 
-CURRENT_SCHEMA_VERSION = 4
+CURRENT_SCHEMA_VERSION = 5
 
 migration_files = {
     1: os.path.join(MIGRATIONS_DIR, 'migration_001_initial_schema.sql'),
     2: os.path.join(MIGRATIONS_DIR, 'migration_002_generalize_invoices.sql'),
     3: os.path.join(MIGRATIONS_DIR, 'migration_003_invoice_reviews.sql'),
     4: os.path.join(MIGRATIONS_DIR, 'migration_004_dismissed_merge_candidates.sql'),
+    5: os.path.join(MIGRATIONS_DIR, 'migration_005_pdf_hashes.sql'),
 }
 
 
@@ -488,8 +489,16 @@ def update_invoice(invoice_id, header, items=None):
     χωρίς 'id' εισάγονται ως νέα. Γραμμές που υπήρχαν αλλά δεν εμφανίζονται
     καθόλου στη νέα λίστα διαγράφονται — ίδια συμπεριφορά "πλήρης
     αντικατάσταση" με πριν για callers που δεν στέλνουν ποτέ 'id' (π.χ. το
-    ήδη υπάρχον native UI του invoicebook)."""
+    ήδη υπάρχον native UI του invoicebook).
+
+    source_pdf_filename: αν το header ΔΕΝ έχει καθόλου το κλειδί, κρατιέται το
+    υπάρχον -- το native invoice form του invoicebook δεν το στέλνει, και πριν
+    κάθε αποθήκευση από εκεί μηδένιζε σιωπηλά τη σύνδεση (το αρχείο έμενε ορφανό
+    στο pdf_store). Ρητό None (π.χ. _resolve_header) συνεχίζει να σημαίνει «χωρίς PDF»."""
     with get_db() as conn:
+        if 'source_pdf_filename' not in header:
+            row = conn.execute('SELECT source_pdf_filename FROM tbl_invoices WHERE id=?', (invoice_id,)).fetchone()
+            header = {**header, 'source_pdf_filename': row['source_pdf_filename'] if row else None}
         duplicate = _find_duplicate(conn, header, exclude_id=invoice_id)
         if duplicate is not None:
             raise ValueError(
@@ -549,8 +558,14 @@ def delete_invoice(invoice_id):
     ON DELETE CASCADE). Μπλοκάρει αν κάποια bulk γραμμή του έχει ήδη
     διαμοιρασμό σε μηχανήματα (tbl_allocations) — το cascade θα το έσβηνε
     αθόρυβα μαζί (ίδιος κίνδυνος με το παλιό update_invoice bug, βλ. πάνω),
-    κι αυτό είναι πραγματικό ιστορικό κατανάλωσης, όχι απλά staging data."""
+    κι αυτό είναι πραγματικό ιστορικό κατανάλωσης, όχι απλά staging data.
+
+    Σβήνει ΚΑΙ το PDF του από το pdf_store (μετά το commit), εκτός αν το ίδιο
+    αρχείο το χρησιμοποιεί κι άλλο τιμολόγιο -- πριν έμενε ορφανό σε κάθε
+    διαγραφή (βλ. 3 ορφανά 2026-09-23)."""
     with get_db() as conn:
+        row = conn.execute('SELECT source_pdf_filename FROM tbl_invoices WHERE id=?', (invoice_id,)).fetchone()
+        pdf_filename = row['source_pdf_filename'] if row else None
         alloc_count = conn.execute(
             '''SELECT COUNT(*) FROM tbl_allocations a
                JOIN tbl_bulk_pools p ON p.id = a.pool_id
@@ -564,6 +579,7 @@ def delete_invoice(invoice_id):
                 f'διαμοιρασμούς (tab Αποθέματα προς Διαμοιρασμό) αν πραγματικά χρειάζεται διαγραφή.'
             )
         conn.execute('DELETE FROM tbl_invoices WHERE id=?', (invoice_id,))
+    return {'pdf_deleted': pdf_filename if _remove_stored_pdf_if_unreferenced(pdf_filename) else None}
 
 
 def delete_invoice_item(item_id):
@@ -686,31 +702,239 @@ def _build_pdf_filename(conn, invoice_id):
     return base + '.pdf'
 
 
+def _same_path(a, b):
+    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+
+
+def _in_pdf_store(path):
+    return _same_path(os.path.dirname(os.path.abspath(path)), PDF_STORE_DIR)
+
+
+def _remove_stored_pdf_if_unreferenced(filename):
+    """Σβήνει ένα αρχείο του pdf_store ΜΟΝΟ αν κανένα τιμολόγιο δεν το αναφέρει.
+    Επιστρέφει True αν σβήστηκε."""
+    if not filename or not PDF_STORE_DIR or os.path.basename(filename) != filename:
+        return False
+    with get_db() as conn:
+        if conn.execute('SELECT 1 FROM tbl_invoices WHERE source_pdf_filename=? LIMIT 1', (filename,)).fetchone():
+            return False
+        conn.execute('DELETE FROM tbl_pdf_hashes WHERE filename=?', (filename,))
+    path = os.path.join(PDF_STORE_DIR, filename)
+    if os.path.isfile(path):
+        os.remove(path)
+        return True
+    return False
+
+
 def attach_pdf(invoice_id, source_path):
+    """Επισυνάπτει/αντικαθιστά το PDF ενός τιμολογίου στο pdf_store, με όνομα από
+    το _build_pdf_filename. Τρεις περιπτώσεις που πριν άφηναν ορφανά/λάθος ονόματα
+    (βλ. Τριαντόπουλος 904, 2026-09-23):
+    - Αντικατάσταση: το ΠΡΟΗΓΟΥΜΕΝΟ αρχείο του τιμολογίου σβήνεται (αν δεν το
+      χρησιμοποιεί άλλο τιμολόγιο) και δεν «πιάνει» το τελικό όνομα -> όχι "(2)".
+    - Πηγή ήδη μέσα στο pdf_store (π.χ. ορφανό αρχείο): μετονομάζεται στη θέση
+      του, δεν μετράει ως σύγκρουση με τον εαυτό του -> όχι "(3)".
+    - Πηγή που είναι το PDF ΑΛΛΟΥ τιμολογίου: αντιγράφεται, δεν μετακινείται
+      (αλλιώς θα έμενε εκείνο χωρίς αρχείο)."""
     if not PDF_STORE_DIR:
         raise RuntimeError('PDF_STORE_DIR δεν έχει οριστεί')
-    if not os.path.exists(source_path):
+    if not os.path.isfile(source_path):
         raise ValueError(f'Το αρχείο δεν βρέθηκε: {source_path}')
+    os.makedirs(PDF_STORE_DIR, exist_ok=True)
 
     with get_db() as conn:
+        row = conn.execute('SELECT source_pdf_filename FROM tbl_invoices WHERE id=?', (invoice_id,)).fetchone()
+        if not row:
+            raise ValueError('Το τιμολόγιο δεν βρέθηκε')
+        old_filename = row['source_pdf_filename']
         filename = _build_pdf_filename(conn, invoice_id)
-        os.makedirs(PDF_STORE_DIR, exist_ok=True)
+        src_name = os.path.basename(source_path) if _in_pdf_store(source_path) else None
+        src_used_by_other = bool(src_name) and conn.execute(
+            'SELECT 1 FROM tbl_invoices WHERE source_pdf_filename=? AND id<>? LIMIT 1', (src_name, invoice_id)
+        ).fetchone() is not None
+        old_used_by_other = bool(old_filename) and conn.execute(
+            'SELECT 1 FROM tbl_invoices WHERE source_pdf_filename=? AND id<>? LIMIT 1', (old_filename, invoice_id)
+        ).fetchone() is not None
+
+    # Η πηγή περνάει πρώτα από προσωρινό όνομα, ώστε ούτε η ίδια ούτε το παλιό αρχείο
+    # να «πιάνουν» το τελικό όνομα κατά την επιλογή του.
+    tmp_path = os.path.join(PDF_STORE_DIR, f'_attach_tmp_{invoice_id}.pdf')
+    if src_used_by_other:
+        shutil.copy2(source_path, tmp_path)
+    else:
+        shutil.move(source_path, tmp_path)
+
+    try:
+        old_path = os.path.join(PDF_STORE_DIR, old_filename) if old_filename else None
         stem, ext = os.path.splitext(filename)
         dest_path = os.path.join(PDF_STORE_DIR, filename)
         counter = 2
-        while os.path.exists(dest_path):
+        # Το παλιό αρχείο του ΙΔΙΟΥ τιμολογίου δεν είναι σύγκρουση -- αντικαθίσταται.
+        while os.path.exists(dest_path) and not (
+                old_path and not old_used_by_other and _same_path(dest_path, old_path)):
             dest_path = os.path.join(PDF_STORE_DIR, f'{stem} ({counter}){ext}')
             counter += 1
-        stored_name = os.path.basename(dest_path)
+        os.replace(tmp_path, dest_path)
+    except Exception:
+        if not src_used_by_other and os.path.exists(tmp_path) and not os.path.exists(source_path):
+            shutil.move(tmp_path, source_path)
+        raise
+    stored_name = os.path.basename(dest_path)
 
-        if os.path.abspath(source_path) != os.path.abspath(dest_path):
-            shutil.move(source_path, dest_path)
-
+    with get_db() as conn:
         conn.execute(
             'UPDATE tbl_invoices SET source_pdf_filename=?, updated_at=? WHERE id=?',
             (stored_name, _now(), invoice_id)
         )
-        return stored_name
+        conn.execute('DELETE FROM tbl_pdf_hashes WHERE filename=?', (stored_name,))
+    if old_filename and old_filename != stored_name:
+        _remove_stored_pdf_if_unreferenced(old_filename)
+    return stored_name
+
+
+# ── ΑΡΧΕΙΑ PDF: ορφανά / χαμένα / ίδιο PDF σε πολλά τιμολόγια (Layer 1 dedup) ──
+# Layer 1 = ίδιο ΑΚΡΙΒΩΣ αρχείο (SHA256), συμπληρωματικό του Layer 2 (_find_duplicate:
+# αρ. παραστατικού+ημερομηνία+προμηθευτής), που χάνει διπλοκαταχωρήσεις όταν το OCR
+# διαβάσει διαφορετικά τον αριθμό (βρέθηκαν 3 τέτοιες 2026-09-23, π.χ. «236»/«Κ2 236»).
+# ΔΕΝ πιάνει ξανα-σαρώσεις του ίδιου χαρτιού (διαφορετικά bytes). Hash μόνο για αρχεία
+# που μοιράζονται μέγεθος με κάποιο άλλο -- ίδιο περιεχόμενο => ίδιο μέγεθος, οπότε τα
+# περισσότερα αρχεία δεν χρειάζεται καν να διαβαστούν.
+
+_PDF_TMP_PREFIXES = ('_merge_tmp_', '_attach_tmp_')
+
+
+def _sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(1 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _store_pdf_files():
+    """{filename: (size, mtime)} για τα PDF του pdf_store (χωρίς προσωρινά)."""
+    if not PDF_STORE_DIR or not os.path.isdir(PDF_STORE_DIR):
+        return {}
+    files = {}
+    for entry in os.scandir(PDF_STORE_DIR):
+        if (entry.is_file() and entry.name.lower().endswith('.pdf')
+                and not entry.name.startswith(_PDF_TMP_PREFIXES)):
+            st = entry.stat()
+            files[entry.name] = (st.st_size, st.st_mtime)
+    return files
+
+
+def _cached_hashes(conn, files, names):
+    """sha256 για τα names (αρχεία του pdf_store), μέσω tbl_pdf_hashes -- ξαναδιαβάζει
+    ένα αρχείο μόνο αν άλλαξε μέγεθος/mtime."""
+    cache = {r['filename']: r for r in conn.execute('SELECT * FROM tbl_pdf_hashes').fetchall()}
+    out = {}
+    for name in names:
+        size, mtime = files[name]
+        c = cache.get(name)
+        if c and c['size'] == size and c['mtime'] == mtime:
+            out[name] = c['sha256']
+            continue
+        sha = _sha256_file(os.path.join(PDF_STORE_DIR, name))
+        conn.execute('INSERT OR REPLACE INTO tbl_pdf_hashes (filename, size, mtime, sha256) VALUES (?, ?, ?, ?)',
+                     (name, size, mtime, sha))
+        out[name] = sha
+    return out
+
+
+def _invoice_pdf_refs(conn):
+    rows = conn.execute(
+        """SELECT i.id, i.doc_date, i.doc_number, i.total_amount, i.source_pdf_filename,
+                  s.name as supplier_name
+           FROM tbl_invoices i LEFT JOIN tbl_suppliers s ON s.id = i.supplier_id
+           WHERE i.source_pdf_filename IS NOT NULL AND i.source_pdf_filename <> ''
+           ORDER BY i.doc_date, i.id"""
+    ).fetchall()
+    refs = {}
+    for r in rows:
+        refs.setdefault(r['source_pdf_filename'], []).append(dict(r))
+    return refs
+
+
+def get_pdf_store_report():
+    """Ορφανά αρχεία (κανένα τιμολόγιο δεν τα αναφέρει), τιμολόγια με PDF που λείπει,
+    και ομάδες τιμολογίων με ΙΔΙΟ ακριβώς PDF (όχι όσες έχουν «Παράβλεψη»)."""
+    files = _store_pdf_files()
+    dismissed = _load_dismissed_keys('pdf')
+    with get_db() as conn:
+        refs = _invoice_pdf_refs(conn)
+        by_size = {}
+        for name, (size, _) in files.items():
+            by_size.setdefault(size, []).append(name)
+        to_hash = [n for group in by_size.values() if len(group) > 1 for n in group]
+        hashes = _cached_hashes(conn, files, to_hash)
+        # καθάρισμα cache από αρχεία που δεν υπάρχουν πια
+        for (name,) in conn.execute('SELECT filename FROM tbl_pdf_hashes').fetchall():
+            if name not in files:
+                conn.execute('DELETE FROM tbl_pdf_hashes WHERE filename=?', (name,))
+
+    existing_refs = [f for f in refs if f in files]
+    by_hash = {}
+    for name in existing_refs:
+        if name in hashes:
+            by_hash.setdefault(hashes[name], []).append(name)
+
+    orphans = []
+    for name in sorted(set(files) - set(refs)):
+        same = by_hash.get(hashes.get(name), [])
+        orphans.append({
+            'filename': name, 'size': files[name][0], 'mtime': files[name][1],
+            # ίδιο περιεχόμενο με το PDF κάποιου τιμολογίου -> ασφαλές να σβηστεί
+            'same_as_invoices': [inv for f in same for inv in refs[f]],
+        })
+
+    missing = [inv for f in sorted(set(refs) - set(files)) for inv in refs[f]]
+
+    duplicates = []
+    for sha, names in by_hash.items():
+        invoices = [inv for f in names for inv in refs[f]]
+        if len(invoices) > 1 and sha not in dismissed:
+            duplicates.append({'dismiss_key': sha, 'invoices': invoices})
+    # Πολλά τιμολόγια στο ΙΔΙΟ όνομα αρχείου με μοναδικό μέγεθος (χωρίς hash) --
+    # επίσης «ίδιο PDF».
+    for name in existing_refs:
+        if name not in hashes and len(refs[name]) > 1 and f'name:{name}' not in dismissed:
+            duplicates.append({'dismiss_key': f'name:{name}', 'invoices': refs[name]})
+    duplicates.sort(key=lambda g: g['invoices'][0]['doc_date'] or '')
+
+    return {'total_files': len(files), 'orphans': orphans, 'missing': missing, 'duplicates': duplicates}
+
+
+def delete_orphan_pdfs(filenames):
+    """Σβήνει ΜΟΝΟ όσα από τα filenames είναι ακόμα ορφανά τη στιγμή της διαγραφής."""
+    deleted = [f for f in filenames if _remove_stored_pdf_if_unreferenced(f)]
+    return {'deleted': len(deleted), 'skipped': len(filenames) - len(deleted)}
+
+
+def find_invoices_with_same_pdf(paths):
+    """Layer 1 έλεγχος πριν την καταχώρηση: τιμολόγια των οποίων το PDF είναι ΙΔΙΟ
+    ακριβώς αρχείο με κάποιο από τα paths (source_pdf_path ενός staging row --
+    string ή λίστα σελίδων)."""
+    if isinstance(paths, str):
+        paths = [paths]
+    paths = [p for p in (paths or []) if p and os.path.isfile(p)]
+    if not paths:
+        return []
+    files = _store_pdf_files()
+    matches = []
+    with get_db() as conn:
+        refs = _invoice_pdf_refs(conn)
+        for p in paths:
+            size = os.path.getsize(p)
+            candidates = [n for n in refs if n in files and files[n][0] == size]
+            if not candidates:
+                continue
+            sha = _sha256_file(p)
+            hashes = _cached_hashes(conn, files, candidates)
+            for name in candidates:
+                if hashes[name] == sha:
+                    matches.extend(dict(inv, matched_path=p) for inv in refs[name])
+    return matches
 
 
 def get_invoice_items_by_category(category=None, date_from=None, date_to=None):

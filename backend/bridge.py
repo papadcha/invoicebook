@@ -95,8 +95,7 @@ def handle(cmd, payload):
         return {'ok': True}
 
     if cmd == 'delete_invoice':
-        database.delete_invoice(_int_id(payload))
-        return {'ok': True}
+        return {'ok': True, **database.delete_invoice(_int_id(payload))}
 
     if cmd == 'attach_pdf':
         stored_name = database.attach_pdf(_int_id(payload), payload['source_path'])
@@ -174,6 +173,15 @@ def handle(cmd, payload):
 
     if cmd == 'delete_orphan_machines':
         return database.delete_orphan_machines(payload['ids'])
+
+    if cmd == 'get_pdf_store_report':
+        return database.get_pdf_store_report()
+
+    if cmd == 'delete_orphan_pdfs':
+        return database.delete_orphan_pdfs(payload['filenames'])
+
+    if cmd == 'find_invoices_with_same_pdf':
+        return database.find_invoices_with_same_pdf(payload.get('paths'))
 
     if cmd == 'dismiss_merge_candidate':
         database.dismiss_merge_candidate(payload['kind'], payload['candidate_key'])

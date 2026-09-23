@@ -1,7 +1,7 @@
-import { escapeHtml, _lock, normalizeGreek, attachAutocomplete } from '../../../js/utils.js';
+import { escapeHtml, _lock, normalizeGreek, attachAutocomplete, fmtDate } from '../../../js/utils.js';
 
 // ── SUBTABS ──────────────────────────────────────────────────────────────────
-const loaded = { suppliers: false, machines: false, descriptions: false };
+const loaded = { suppliers: false, machines: false, descriptions: false, pdfs: false };
 
 document.querySelectorAll('.subtab[data-subtab]').forEach(btn => btn.addEventListener('click', () => {
   const tab = btn.dataset.subtab;
@@ -10,6 +10,7 @@ document.querySelectorAll('.subtab[data-subtab]').forEach(btn => btn.addEventLis
   if (tab === 'suppliers' && !loaded.suppliers) { loaded.suppliers = true; loadSupplierCandidates(); }
   if (tab === 'machines' && !loaded.machines) { loaded.machines = true; loadMachineCandidates(); loadOrphanMachines(); }
   if (tab === 'descriptions' && !loaded.descriptions) { loaded.descriptions = true; loadDescriptionCandidates(); }
+  if (tab === 'pdfs' && !loaded.pdfs) { loaded.pdfs = true; loadPdfReport(); }
 }));
 
 // ── ΓΕΝΙΚΟ MODAL ΠΡΟΕΠΙΣΚΟΠΗΣΗΣ/ΣΥΓΧΩΝΕΥΣΗΣ (προμηθευτές/μηχανήματα) ─────────
@@ -285,6 +286,102 @@ async function loadDescriptionCandidates() {
     }
     loadDescriptionCandidates();
   }));
+}
+
+// ── ΑΡΧΕΙΑ PDF: ορφανά / χαμένα / ίδιο PDF σε πολλά τιμολόγια ────────────────
+function pdfInvoiceLabel(inv) {
+  return `#${inv.id} · ${escapeHtml(fmtDate(inv.doc_date))} · ${escapeHtml(inv.supplier_name || '—')} · ${escapeHtml(inv.doc_number || '—')}`;
+}
+
+async function loadPdfReport() {
+  const el = document.getElementById('pdf-report');
+  el.innerHTML = '<p class="muted-sm">Έλεγχος αρχείων…</p>';
+  const rep = await pyCall('get_pdf_store_report');
+  if (!rep) { el.innerHTML = '<p class="muted-sm">Αποτυχία ελέγχου.</p>'; return; }
+
+  const summary = `<p class="muted-sm" style="margin-bottom:12px;">${rep.total_files} αρχεία · ` +
+    `${rep.orphans.length} ορφανά · ${rep.missing.length} τιμολόγια με αρχείο που λείπει · ` +
+    `${rep.duplicates.length} ομάδες με ίδιο PDF</p>`;
+  if (!rep.orphans.length && !rep.missing.length && !rep.duplicates.length) {
+    el.innerHTML = summary + '<div class="empty-state"><div class="icon">✅</div><p>Κανένα πρόβλημα στα αρχεία PDF.</p></div>';
+    return;
+  }
+  const openBtn = f => `<button class="btn btn-outline btn-sm" data-pdf-open="${escapeHtml(f)}" title="Άνοιγμα PDF">📄</button>`;
+
+  const orphansHtml = !rep.orphans.length ? '' : `
+    <p style="margin:14px 0 6px;"><b>Ορφανά αρχεία</b> <span class="muted-sm">— κανένα τιμολόγιο δεν τα χρησιμοποιεί. Άνοιξέ τα πριν τα σβήσεις.</span></p>
+    <div class="table-wrap"><table>
+      <thead><tr><th style="width:32px;"><input type="checkbox" id="orphan-pdf-all"></th><th>Αρχείο</th><th>Μέγεθος</th><th>Παρατήρηση</th><th></th></tr></thead>
+      <tbody>${rep.orphans.map(o => `
+        <tr>
+          <td><input type="checkbox" class="orphan-pdf-cb" value="${escapeHtml(o.filename)}"></td>
+          <td>${escapeHtml(o.filename)}</td>
+          <td class="muted-sm">${(o.size / 1024).toFixed(0)} KB</td>
+          <td class="muted-sm">${o.same_as_invoices.length
+            ? `Ίδιο ακριβώς αρχείο με το PDF του ${o.same_as_invoices.map(pdfInvoiceLabel).join(', ')} — ασφαλές να σβηστεί`
+            : '—'}</td>
+          <td style="white-space:nowrap;">${openBtn(o.filename)}</td>
+        </tr>`).join('')}</tbody></table></div>
+    <div class="form-actions"><button type="button" class="btn btn-danger" id="orphan-pdf-delete-btn"></button></div>`;
+
+  const missingHtml = !rep.missing.length ? '' : `
+    <p style="margin:18px 0 6px;"><b>Τιμολόγια με αρχείο που λείπει</b> <span class="muted-sm">— ξαναεπισύναψε το PDF από τη σελίδα Τιμολόγια.</span></p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Τιμολόγιο</th><th>Αρχείο (λείπει)</th></tr></thead>
+      <tbody>${rep.missing.map(inv => `
+        <tr><td>${pdfInvoiceLabel(inv)}</td><td class="muted-sm">${escapeHtml(inv.source_pdf_filename)}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+
+  const dupHtml = !rep.duplicates.length ? '' : `
+    <p style="margin:18px 0 6px;"><b>Ίδιο PDF σε πολλά τιμολόγια</b> <span class="muted-sm">— πιθανή διπλοκαταχώρηση ή λάθος επισύναψη. «Παράβλεψη» αν είναι σωστό (π.χ. μία σάρωση με 2 τιμολόγια).</span></p>
+    ${rep.duplicates.map((g, gi) => `
+      <div class="table-wrap" style="margin-bottom:8px;"><table><tbody>
+        ${g.invoices.map(inv => `
+          <tr><td>${pdfInvoiceLabel(inv)}</td><td class="muted-sm">${escapeHtml(inv.source_pdf_filename)}</td><td style="white-space:nowrap;">${openBtn(inv.source_pdf_filename)}</td></tr>`).join('')}
+        <tr><td colspan="3"><button class="btn btn-outline btn-sm" data-pdf-dismiss="${gi}">Παράβλεψη</button></td></tr>
+      </tbody></table></div>`).join('')}`;
+
+  el.innerHTML = summary + orphansHtml + missingHtml + dupHtml;
+
+  el.querySelectorAll('[data-pdf-open]').forEach(btn => btn.addEventListener('click', async () => {
+    const r = await window.api.openStoredFile(btn.dataset.pdfOpen);
+    if (!r.ok) App.toast('Δεν ήταν δυνατό το άνοιγμα: ' + r.error, 'fail');
+  }));
+  el.querySelectorAll('[data-pdf-dismiss]').forEach(btn => btn.addEventListener('click', async () => {
+    const g = rep.duplicates[parseInt(btn.dataset.pdfDismiss, 10)];
+    await pyCallStrict('dismiss_merge_candidate', { kind: 'pdf', candidate_key: g.dismiss_key });
+    loadPdfReport();
+  }));
+
+  if (!rep.orphans.length) return;
+  const delBtn = document.getElementById('orphan-pdf-delete-btn');
+  const boxes = [...el.querySelectorAll('.orphan-pdf-cb')];
+  const selected = () => boxes.filter(b => b.checked).map(b => b.value);
+  const refreshBtn = () => {
+    const n = selected().length;
+    delBtn.textContent = `Διαγραφή επιλεγμένων (${n})`;
+    delBtn.disabled = n === 0;
+  };
+  refreshBtn();
+  document.getElementById('orphan-pdf-all').addEventListener('change', e => {
+    boxes.forEach(b => { b.checked = e.target.checked; });
+    refreshBtn();
+  });
+  boxes.forEach(b => b.addEventListener('change', refreshBtn));
+  delBtn.addEventListener('click', async () => {
+    const filenames = selected();
+    if (!(await App.confirmAsync(`Οριστική διαγραφή ${filenames.length} ορφανού/ών αρχείου/ων PDF από τον φάκελο;`))) return;
+    const unlock = _lock(delBtn);
+    try {
+      const r = await pyCallStrict('delete_orphan_pdfs', { filenames });
+      const skippedText = r.skipped ? ` (${r.skipped} παραλείφθηκαν — χρησιμοποιούνται πλέον από τιμολόγιο)` : '';
+      App.toast(`Διαγράφηκαν ${r.deleted} αρχείο/α${skippedText}`, 'ok');
+      loadPdfReport();
+    } catch (e) {
+      App.toast(e.message, 'fail');
+      unlock();
+    }
+  });
 }
 
 loadSupplierCandidates();

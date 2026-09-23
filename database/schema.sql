@@ -115,6 +115,15 @@ CREATE TABLE tbl_dismissed_merge_candidates (
   UNIQUE(kind, candidate_key)
 );
 
+-- Cache SHA256 ανά αρχείο του pdf_store (Layer 1 dedup: ίδιο ακριβώς PDF σε δύο
+-- τιμολόγια) — βλ. migration_005_pdf_hashes.sql. Καθαρά cache, αναδημιουργείται.
+CREATE TABLE tbl_pdf_hashes (
+  filename TEXT PRIMARY KEY,
+  size INTEGER NOT NULL,
+  mtime REAL NOT NULL,
+  sha256 TEXT NOT NULL
+);
+
 CREATE TABLE tbl_schema_version (
   version INTEGER NOT NULL,
   applied_at TEXT NOT NULL,

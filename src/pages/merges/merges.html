@@ -7,6 +7,7 @@
   <button class="subtab active" data-subtab="suppliers">ΠΡΟΜΗΘΕΥΤΕΣ</button>
   <button class="subtab" data-subtab="machines">ΜΗΧΑΝΗΜΑΤΑ</button>
   <button class="subtab" data-subtab="descriptions">ΠΕΡΙΓΡΑΦΕΣ</button>
+  <button class="subtab" data-subtab="pdfs">ΑΡΧΕΙΑ PDF</button>
 </div>
 
 <!-- ── ΠΡΟΜΗΘΕΥΤΕΣ ── -->
@@ -80,6 +81,19 @@
       η πιο συχνή γραφή προτείνεται ως η «σωστή». Ξαναγράφει description σε γραμμές τιμολογίων, καμία διαγραφή γραμμής.
     </p>
     <div id="description-candidates-list"></div>
+  </div>
+</div>
+
+<!-- ── ΑΡΧΕΙΑ PDF ── -->
+<div class="subtab-panel" id="panel-pdfs" style="display:none;">
+  <div class="card">
+    <div class="card-title">Αρχεία PDF</div>
+    <p class="muted-sm" style="margin-bottom:14px;">
+      Έλεγχος του φακέλου PDF: αρχεία που δεν ανήκουν σε κανένα τιμολόγιο (ορφανά), τιμολόγια που δείχνουν
+      σε αρχείο που λείπει, και τιμολόγια με το ΙΔΙΟ ακριβώς PDF (πιθανή διπλοκαταχώρηση ή λάθος επισύναψη —
+      δεν πιάνει ξανα-σαρώσεις του ίδιου χαρτιού).
+    </p>
+    <div id="pdf-report"></div>
   </div>
 </div>
 

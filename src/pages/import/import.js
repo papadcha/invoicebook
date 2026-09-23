@@ -258,14 +258,24 @@ async function loadStaging() {
         unlock();
         return;
       }
-      const res = await pyCallStrict('confirm_staging_row', { id: stagingId });
-      if (row?.data?.source_pdf_path) {
-        try {
-          await pyCallStrict('attach_pdf', { id: res.invoice_id, source_path: row.data.source_pdf_path });
-        } catch (pdfErr) {
-          App.toast('Καταχωρήθηκε, αλλά το PDF δεν επισυνάφθηκε: ' + pdfErr.message, 'warn');
-        }
+      // Layer 1: ίδιο ΑΚΡΙΒΩΣ αρχείο PDF με ήδη καταχωρημένο τιμολόγιο -- πιάνει
+      // διπλοκαταχωρήσεις που ο παραπάνω έλεγχος χάνει όταν ο αριθμός/η ημερομηνία
+      // διαβάστηκαν διαφορετικά (π.χ. «236» / «Κ2 236», 2026-09-23).
+      const samePdf = await pyCallStrict('find_invoices_with_same_pdf', { paths: row.data.source_pdf_path });
+      if (samePdf.length) {
+        const invoices = [...new Map(samePdf.map(i => [i.id, i])).values()]
+          .map(i => `#${i.id} (${i.doc_number || '—'}, ${i.doc_date}, ${i.supplier_name || '—'})`).join(', ');
+        const proceed = await App.confirmAsync(
+          `Το PDF αυτής της γραμμής είναι ΙΔΙΟ ακριβώς αρχείο με το PDF του ήδη καταχωρημένου ` +
+          `τιμολογίου ${invoices} — πιθανή διπλοκαταχώρηση (ο αριθμός ή η ημερομηνία ίσως ` +
+          `διαβάστηκαν διαφορετικά). Καταχώρηση παρ' όλα αυτά;`
+        );
+        if (!proceed) { unlock(); return; }
       }
+      // Το confirm_staging_row επισυνάπτει ήδη το PDF (source_pdf_path) στο backend --
+      // ένα δεύτερο attach_pdf εδώ έβρισκε το αρχείο ήδη μετακινημένο και έβγαζε ψευδές
+      // «δεν επισυνάφθηκε».
+      await pyCallStrict('confirm_staging_row', { id: stagingId });
       App.toast('Καταχωρήθηκε ως τιμολόγιο', 'ok');
       window.reloadLookups();
       loadStaging();
