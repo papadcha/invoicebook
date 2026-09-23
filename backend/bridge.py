@@ -174,6 +174,9 @@ def handle(cmd, payload):
     if cmd == 'delete_orphan_machines':
         return database.delete_orphan_machines(payload['ids'])
 
+    if cmd == 'get_single_supplier_plate_machines':
+        return database.get_single_supplier_plate_machines()
+
     if cmd == 'get_pdf_store_report':
         return database.get_pdf_store_report()
 

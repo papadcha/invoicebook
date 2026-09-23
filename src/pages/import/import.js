@@ -15,6 +15,15 @@ function canonicalMachineName(name) {
   return match ? match.name : name;
 }
 
+// Μορφή ελληνικής πινακίδας (3 από τα 14 κοινά γράμματα + 4 ψηφία) — ίδιος κανόνας με το
+// backend's _is_plate_code / intake-tool's PLATE_RE. ΝΕΟ μηχάνημα με τέτοια μορφή είναι
+// συνήθως το φορτηγό παράδοσης του προμηθευτή («ΑΡ. ΟΧΗΜΑΤΟΣ»), όχι δικό μας μηχάνημα.
+const PLATE_RE = /^[ABEZHIKMNOPTYX]{3}\d{4}$/;
+function isUnknownPlate(name) {
+  const norm = normalizeMachineCode(name);
+  return PLATE_RE.test(norm) && !(window.AppState.machines || []).some(m => normalizeMachineCode(m.name) === norm);
+}
+
 // ── AI PROMPT ────────────────────────────────────────────────────────────────
 // Ένα μόνο, γενικό prompt — ζητάει category/machine_name/efk_eligible/bulk ανά
 // γραμμή, ώστε η κατηγοριοποίηση να έρχεται έτοιμη από το AI (ο χειριστής τη
@@ -272,6 +281,11 @@ async function loadStaging() {
         );
         if (!proceed) { unlock(); return; }
       }
+      const plates = [...new Set((row.data.items || []).map(it => it.machine_name).filter(n => n && isUnknownPlate(n)))];
+      if (plates.length && !(await App.confirmAsync(
+        `Νέο μηχάνημα με μορφή πινακίδας: ${plates.join(', ')} — έλεγξε στο PDF ότι δεν είναι το ` +
+        `όχημα παράδοσης του προμηθευτή (πεδίο «ΑΡ. ΟΧΗΜΑΤΟΣ»/«ΜΕΤΑΦΟΡΙΚΟ ΜΕΣΟ»). Καταχώρηση παρ' όλα αυτά;`
+      ))) { unlock(); return; }
       // Το confirm_staging_row επισυνάπτει ήδη το PDF (source_pdf_path) στο backend --
       // ένα δεύτερο attach_pdf εδώ έβρισκε το αρχείο ήδη μετακινημένο και έβγαζε ψευδές
       // «δεν επισυνάφθηκε».

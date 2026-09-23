@@ -1108,6 +1108,52 @@ def get_machine_merge_candidates():
     return candidates
 
 
+# Μορφή ελληνικής πινακίδας: 3 γράμματα ΜΟΝΟ από τα 14 κοινά Ελληνικών/Λατινικών
+# (Α Β Ε Ζ Η Ι Κ Μ Ν Ο Ρ Τ Υ Χ — το _normalize_machine_code τα φέρνει ήδη σε λατινικά) + 4
+# ψηφία: NHY7148, «ΚΙΗ 2990», «ΝΧΥ-1513» — όχι «CAT 980» (C, 3 ψηφία) ή «NLY 7146» (L δεν
+# υπάρχει σε ελληνική πινακίδα). Κανόνας από τον χρήστη 2026-09-23. Ίδιος με το PLATE_RE
+# του intake-tool's js/import.js. Οι πινακίδες μηχανημάτων έργων («ΜΕ» + 5 ψηφία) ΣΚΟΠΙΜΑ
+# δεν ταιριάζουν: είναι ακριβώς τα δικά μας μηχανήματα-στόχοι, όχι φορτηγά παράδοσης. Αφορά το «μεταφορικό μέσο» λάθος: το Gemini βάζει μερικές φορές ως
+# μηχάνημα την πινακίδα του φορτηγού ΠΑΡΑΔΟΣΗΣ του προμηθευτή (πεδία «ΑΡ. ΟΧΗΜΑΤΟΣ»/
+# «ΜΕΤΑΦΟΡΙΚΟ ΜΕΣΟ»), όχι το μηχάνημα-στόχο (βλ. ΝΧΥ1513/NLY 7146, sweep 2026-09-17).
+_PLATE_RE = re.compile(r'^[ABEZHIKMNOPTYX]{3}\d{4}$')
+
+
+def _is_plate_code(name):
+    return bool(_PLATE_RE.match(_normalize_machine_code(name)))
+
+
+def get_single_supplier_plate_machines():
+    """Μηχανήματα με μορφή πινακίδας που εμφανίζονται σε τιμολόγια ΕΝΟΣ μόνο
+    προμηθευτή — το χαρακτηριστικό σημάδι του φορτηγού παράδοσης εκείνου του
+    προμηθευτή. Τα πραγματικά οχήματα της εταιρείας (π.χ. NHY7148) εμφανίζονται σε
+    πολλούς προμηθευτές. Όχι όσα έχουν «Παράβλεψη» (kind 'plate', key = machine id)."""
+    dismissed = _load_dismissed_keys('plate')
+    with get_db() as conn:
+        machines = [dict(r) for r in conn.execute('SELECT id, name FROM tbl_machines').fetchall()]
+        out = []
+        for m in machines:
+            if not _is_plate_code(m['name']) or str(m['id']) in dismissed:
+                continue
+            rows = conn.execute(
+                '''SELECT i.id AS invoice_id, i.doc_date, i.supplier_id, s.name AS supplier_name,
+                          ii.description
+                   FROM tbl_invoice_items ii JOIN tbl_invoices i ON i.id = ii.invoice_id
+                   LEFT JOIN tbl_suppliers s ON s.id = i.supplier_id
+                   WHERE ii.machine_id=? ORDER BY i.doc_date''', (m['id'],)
+            ).fetchall()
+            if not rows or len({r['supplier_id'] for r in rows}) != 1:
+                continue
+            descriptions = list(dict.fromkeys(r['description'] for r in rows if r['description']))
+            out.append({
+                'id': m['id'], 'name': m['name'], 'supplier_name': rows[0]['supplier_name'],
+                'line_count': len(rows), 'invoice_count': len({r['invoice_id'] for r in rows}),
+                'date_from': rows[0]['doc_date'], 'date_to': rows[-1]['doc_date'],
+                'sample_descriptions': descriptions[:5], 'dismiss_key': str(m['id']),
+            })
+    return out
+
+
 def get_machine_merge_preview(keep_id, merge_id):
     with get_db() as conn:
         items = conn.execute(

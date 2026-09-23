@@ -8,7 +8,7 @@ document.querySelectorAll('.subtab[data-subtab]').forEach(btn => btn.addEventLis
   document.querySelectorAll('.subtab[data-subtab]').forEach(b => b.classList.toggle('active', b === btn));
   document.querySelectorAll('.subtab-panel').forEach(p => p.style.display = (p.id === `panel-${tab}` ? '' : 'none'));
   if (tab === 'suppliers' && !loaded.suppliers) { loaded.suppliers = true; loadSupplierCandidates(); }
-  if (tab === 'machines' && !loaded.machines) { loaded.machines = true; loadMachineCandidates(); loadOrphanMachines(); }
+  if (tab === 'machines' && !loaded.machines) { loaded.machines = true; loadMachineCandidates(); loadOrphanMachines(); loadPlateMachines(); }
   if (tab === 'descriptions' && !loaded.descriptions) { loaded.descriptions = true; loadDescriptionCandidates(); }
   if (tab === 'pdfs' && !loaded.pdfs) { loaded.pdfs = true; loadPdfReport(); }
 }));
@@ -199,6 +199,28 @@ document.getElementById('machine-manual-btn').addEventListener('click', () => {
     onDone: () => { loadMachineCandidates(); loadOrphanMachines(); },
   });
 });
+
+async function loadPlateMachines() {
+  const el = document.getElementById('plate-machines-list');
+  el.innerHTML = '<p class="muted-sm">Φόρτωση…</p>';
+  const rows = await pyCall('get_single_supplier_plate_machines') || [];
+  if (!rows.length) { el.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>Καμία ύποπτη πινακίδα.</p></div>'; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Μηχάνημα</th><th>Προμηθευτής</th><th>Τιμολόγια / γραμμές</th><th>Είδη</th><th></th></tr></thead>
+    <tbody>${rows.map((r, i) => `
+      <tr>
+        <td><b>${escapeHtml(r.name)}</b></td>
+        <td>${escapeHtml(r.supplier_name || '—')}</td>
+        <td class="muted-sm">${r.invoice_count} / ${r.line_count}<br>${escapeHtml(fmtDate(r.date_from))}${r.date_to !== r.date_from ? ` – ${escapeHtml(fmtDate(r.date_to))}` : ''}</td>
+        <td class="muted-sm">${r.sample_descriptions.map(escapeHtml).join(', ')}</td>
+        <td><button class="btn btn-outline btn-sm" data-plate-dismiss="${i}">Παράβλεψη</button></td>
+      </tr>`).join('')}</tbody></table></div>`;
+  el.querySelectorAll('[data-plate-dismiss]').forEach(btn => btn.addEventListener('click', async () => {
+    const r = rows[parseInt(btn.dataset.plateDismiss, 10)];
+    await pyCallStrict('dismiss_merge_candidate', { kind: 'plate', candidate_key: r.dismiss_key });
+    loadPlateMachines();
+  }));
+}
 
 async function loadOrphanMachines() {
   const el = document.getElementById('orphan-machines-list');
