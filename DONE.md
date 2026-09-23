@@ -130,6 +130,52 @@ invoicebook αυτό ζει μέσα στο ξεχωριστό page-module `brow
 Μετά από αυτό, μόνο το σχεδόν άδειο «⚙ Ρυθμίσεις» παραμένει αποκλειστικά στο intake-tool —
 καμία άλλη λειτουργικότητα δεν λείπει πια από το invoicebook.
 
+## [Cross-repo] backup-on-close και στο invoicebook, Phase 1 — διόρθωση παλιάς εκτίμησης (2026-09-23)
+
+Κατά τον έλεγχο του «⚙ Ρυθμίσεις» tab βρέθηκε ότι η περιγραφή του CLAUDE.md ("σχεδόν άδειο")
+ήταν λανθασμένη/ξεπερασμένη — στην πραγματικότητα είναι ώριμο σύστημα backup-on-close (900
+γραμμές `backend/backup.py` + 375 `js/backup.js` + wiring στο `main.js`), χτισμένο σταδιακά
+τις προηγούμενες εβδομάδες. Το CLAUDE.md διορθώθηκε.
+
+Διαπιστώθηκε ότι το invoicebook δεν είχε **καμία** δική του λογική backup — αν ο χρήστης
+έκλεινε το invoicebook αντί για το intake-tool, δεν έτρεχε τίποτα. Ο χρήστης διάλεξε ρητά
+φασική προσέγγιση: **μόνο backup-on-close πρώτα**, χωρίς restore/rclone-remotes-UI/manual-
+snapshot-cleanup/pdf-archive-management — αυτά μένουν προς το παρόν μόνο στο intake-tool.
+
+**Αλλαγή σχεδιασμού, με απόφαση χρήστη**: το `backup_config.json` ζούσε μέσα στο ίδιο το
+intake-tool repo (`backend/backup_config.json`, `INTAKE_TOOL_DATA_DIR` env var) — ρητά
+τεκμηριωμένη απόφαση σε παλιότερο script comment ("ζει στο intake-tool, όχι στο invoices").
+Δεν ταίριαζε πια αν ΚΑΙ τα δύο προγράμματα κάνουν backup. Ο χρήστης διάλεξε: **το config
+μετακομίζει δίπλα στη βάση** (`dirname(INVOICES_DB_PATH)`) — και τα δύο προγράμματα ήδη
+διαβάζουν το ίδιο `INVOICES_DB_PATH`, οπότε μοιράζονται αυτόματα το ίδιο config χωρίς νέο
+env var, και το αρχείο ταξιδεύει αυτόματα μαζί με τη βάση στον εξωτερικό δίσκο — καταργεί
+την ανάγκη για το `scripts/restore-backup-config-from-drive.ps1` σε μελλοντικές μεταφορές
+(το script μένει, απλά δεν θα χρειαστεί ξανά).
+
+**intake-tool** (commit `c0cc180`): μία γραμμή, `backup.DATA_DIR = _INTAKE_DATA_DIR` →
+`backup.DATA_DIR = os.path.dirname(_INVOICES_DB_PATH)`. Το υπάρχον production
+`backup_config.json` σε αυτό το μηχάνημα (dev προορισμοί: `mega:invoicebook-backup-dev`,
+`pcloud:invoicebook-backup-dev`) αντιγράφηκε (ΟΧΙ μετακινήθηκε) στη νέα θέση
+(`C:\invoices\backend\backup_config.json`) — checksum επιβεβαιώθηκε ίδιο. Το παλιό αντίγραφο
+μένει αδρανές στη θέση του, δεν διαγράφηκε.
+
+**invoicebook** (commit `9afd7b4`): νέο αρχείο `backend/backup.py` (αντίγραφο αυτούσιο —
+ήδη portable, "Port από το αδερφό project C:\expvault", παίρνει `DB_PATH`/`PDF_STORE_DIR`/
+`DATA_DIR` ως module-level vars). Bridge.py wiring μόνο για `get_backup_config`/`run_backup`
+(όχι list_backups/restore/remotes/manual-snapshots/pdf-archive — καμία σελίδα να τα καλέσει
+ακόμα). `main.js`: πόρτο αυτούσιο του close-interception block (με το ήδη διορθωμένο
+`preventDefault()`-πρέπει-να-είναι-synchronous bug), `callPython` πήρε 3ο param `timeoutMs`
+(ήταν hardcoded 120s, το backup μπορεί να αργήσει πολύ περισσότερο). Progress overlay +
+listener μπήκαν στο `js/main-app.js` (όχι σε page module — πρέπει να δουλεύει ανεξάρτητα από
+ποια σελίδα είναι ανοιχτή στο κλείσιμο).
+
+Δοκιμάστηκε (και στα δύο προγράμματα, throwaway db + scratch-local-folder-only config):
+πραγματικό backup έτρεξε σωστά στο κλείσιμο (`.db.gz` δημιουργήθηκε, config's
+last_status/dest_state ενημερώθηκαν σωστά, overlay εμφανίστηκε με σωστό μήνυμα)· χωρίς
+κανένα configured path το κλείσιμο έγινε σε ~530ms χωρίς καθυστέρηση/overlay· μηδέν console
+errors. Πραγματικό `invoicebook.db` ΚΑΙ τα δύο πραγματικά `backup_config.json` (intake-tool's
+πλέον αδρανές + το νέο κοινό) επιβεβαιωμένα byte-identical πριν/μετά σε όλες τις δοκιμές.
+
 ## [invoicebook] Σελίδα «Αποθέματα» — πόρτο του bulk-pool UI από το intake-tool (2026-09-23)
 
 Συνέχεια της ανά-feature ενοποίησης intake-tool→invoicebook (μετά το `08edc07` που έφερε

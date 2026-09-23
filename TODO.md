@@ -115,8 +115,24 @@ read-only της «Περιήγησης» (`9558039`), Φάση 2 σήμανση
 το ✏️ inline edit shortcut (η διόρθωση γίνεται από την «Περιήγηση» — δες DONE.md γιατί δεν
 μεταφέρθηκε το κουμπί).
 
-Ό,τι μένει ΜΟΝΟ στο intake-tool: το σχεδόν άδειο «⚙ Ρυθμίσεις». Καμία άλλη λειτουργικότητα
-δεν λείπει πια από το invoicebook.
+**Συνέχεια 2026-09-23 (3) — Διόρθωση παλιάς λανθασμένης σημείωσης**: το «⚙ Ρυθμίσεις» ΔΕΝ
+ήταν σχεδόν άδειο όπως έλεγε το CLAUDE.md (πια διορθωμένο εκεί) — είναι ώριμο σύστημα
+backup-on-close (900 γραμμές `backend/backup.py`). Το invoicebook δεν είχε καμία δική του
+λογική backup μέχρι τώρα· έγινε **backup-on-close Phase 1** εκεί (commit `9afd7b4`,
+συνοδευτικό commit `c0cc180` εδώ στο intake-tool — βλ. DONE.md και για τα δύο). Σημαντική
+αλλαγή σχεδιασμού: το `backup_config.json` μετακόμισε από `intake-tool/backend/` σε
+**δίπλα στη βάση** (`dirname(INVOICES_DB_PATH)`) — και τα δύο προγράμματα μοιράζονται πλέον
+το ίδιο config αυτόματα. Το `scripts/restore-backup-config-from-drive.ps1` είναι πλέον
+**περιττό για μελλοντικές μεταφορές** (το αρχείο ταξιδεύει ήδη μαζί με τη βάση) — δεν
+διαγράφηκε, απλώς δεν θα χρειαστεί ξανά.
+- [ ] Επόμενη φάση (2, όποτε χρειαστεί): σελίδα «Ρυθμίσεις» στο invoicebook — add/remove
+      destination, max_keep, rclone remotes, ιστορικό, restore, manual snapshots, pdf
+      archive management. Ρητά εκτός scope της Phase 1. Μέχρι τότε η διαμόρφωση προορισμών
+      γίνεται ΜΟΝΟ από το intake-tool's ήδη υπάρχον Ρυθμίσεις tab (ίδιο κοινό αρχείο πλέον).
+
+Ό,τι μένει ΜΟΝΟ στο intake-tool: η ίδια η σελίδα/UI των Ρυθμίσεων (config μία φορά, ιστορικό,
+restore, remotes, manual snapshots, pdf archive) — το backup-on-close τρέχει πλέον και στα
+δύο. Καμία άλλη λειτουργικότητα δεν λείπει πια από το invoicebook.
 - [ ] Ιδέα (όχι αίτημα): αξίζει project skill `run-invoicebook` (μοτίβο ίδιο με το
       `run-intake-tool`) — οι δοκιμές όλων αυτών των φάσεων χρειάστηκαν custom one-off
       Playwright scripts αφού δεν υπήρχε ήδη ένα. Μόνο αν ζητηθεί.
