@@ -3,6 +3,43 @@
 Ό,τι έχει ολοκληρωθεί από τη λίστα εργασιών του project Γαλάτιστας. Βλ.
 `TODO.md` για ό,τι μένει. Ίδιο αρχείο και στα 3 repos.
 
+## [Cross-repo] Two-machine split: προετοιμασία coding PC + 2 backup bugs (2026-09-19 → 2026-09-23)
+
+Ξεκίνησε 2026-09-19 (commit `5ccbdc0`, `invoices/scripts/transfer-to-external-drive.ps1`)
+— στόχος να χωριστεί το ένα PC που κάνει και coding/testing ΚΑΙ πραγματική καταχώρηση σε
+δύο: αυτό εδώ (coding) + νέο data-entry PC με τη "ζωντανή" βάση. Ό,τι μένει (το ίδιο το
+νέο PC) είναι στο TODO.md.
+
+- Εξωτερικός δίσκος (volume label `INVOICEBOOK-DATA`): `invoicebook.db` + `pdf_store`
+  (αντιγραφή, όχι μετακίνηση), `backup_config.json` (αντίγραφο του **production** config:
+  mega/pcloud/Z:) + νέο `intake-tool/scripts/restore-backup-config-from-drive.ps1` (τρέχει
+  ΣΤΟ νέο μηχάνημα, κρατάει αντίγραφο αν βρει ήδη config). Launcher: το ήδη υπάρχον
+  `launch-portable.ps1` (εντοπίζει τον δίσκο από volume label, ρυθμίζει env vars).
+- Coding PC: το τοπικό (gitignored) `backup_config.json` άλλαξε σε
+  `mega:invoicebook-backup-dev`/`pcloud:invoicebook-backup-dev` (αφαιρέθηκε το μη
+  προσβάσιμο `Z:\...`), ώστε τα δοκιμαστικά κλεισίματα να μη ροκανίζουν το keep-last-20
+  των production backups.
+- Ζωντανό χρονόμετρο + breakdown ανά προορισμό στο backup-on-close overlay
+  (`js/backup.js`, `index.html`, `preload.js`· `run_all_backups` επιστρέφει
+  `elapsed_sec`/`total_elapsed_sec`).
+- **Bug 1 — IPC timeout**: το `main.js`'s `callPython()` είχε γενικό 120s timeout, πολύ
+  μικρότερο από τα per-destination timeouts του `backup.py` (έως 1800s) → ψεύτικο ⚠️ error
+  σε πρώτο sync + κλείσιμο της εφαρμογής στη μέση του upload. Fix: reachability precheck
+  στο `do_backup()` + ξεχωριστό 45λεπτο όριο για το `run_backup` IPC call.
+- **Bug 2 — νέος προορισμός μόνιμα "απρόσιτος"**: το `_check_reachable()` έτρεχε
+  `rclone lsd` στον ΙΔΙΟ τον υποφάκελο· σε νέο προορισμό (υποφάκελος δεν υπάρχει ακόμα)
+  το "directory not found" εκλαμβανόταν ως απρόσιτο remote και μπλόκαρε για πάντα το
+  πρώτο backup. Fix: έλεγχος στη ΡΙΖΑ του remote (`pcloud:`).
+- Και τα δύο fixes έγιναν commit στο `bb269a0` (21/9).
+- **Επαλήθευση (2026-09-23)**: `backup_config.json` δείχνει `ok: true` και για τους 2 dev
+  προορισμούς (last_backup 21/09/2026 11:54:04)· `rclone size` επιβεβαίωσε
+  `pcloud:invoicebook-backup-dev/pdf_store` = 2717 αρχεία (ίδιο με το τοπικό `pdf_store`),
+  `mega:` = 2732 (15 παραπάνω, από παλιότερα test runs — αναμενόμενο, το mirror δεν
+  σβήνει). Και οι 2 προορισμοί έχουν `.db` snapshot + `pdf_store_archives/`.
+- **Απόφαση: όχι "heartbeat mid-session" upload** (2026-09-21): η staleness-gate ήδη κάνει
+  incremental sync· τα 24λ που μετρήθηκαν ήταν το πρώτο ποτέ sync σε άδειο `-dev`
+  προορισμό (2717 αρχεία), όχι τυπικό κλείσιμο.
+
 ## [intake-tool/invoicebook] Split-tool: διάσπαση γραμμής σε πολλά μηχανήματα (2026-09-17)
 
 Υλοποιήθηκε το εργαλείο που έλειπε από τα 3 χειροκίνητα split περιστατικά του machine
