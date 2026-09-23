@@ -3,6 +3,26 @@
 Ό,τι έχει ολοκληρωθεί από τη λίστα εργασιών του project Γαλάτιστας. Βλ.
 `TODO.md` για ό,τι μένει. Ίδιο αρχείο και στα 3 repos.
 
+## [invoicebook] Σελίδα «Αποθέματα» — πόρτο του bulk-pool UI από το intake-tool (2026-09-23)
+
+Συνέχεια της ανά-feature ενοποίησης intake-tool→invoicebook (μετά το `08edc07` που έφερε
+Εισαγωγή/Συγχωνεύσεις). Η backend λογική (`list_open_bulk_pools`/`add_allocation`/
+`close_bulk_pool`/`delete_bulk_pool`) ζούσε ήδη μέσα στο invoicebook's δικό του
+`backend/database.py` — έλειπε μόνο το wiring στο δικό του `backend/bridge.py`
+(+ στο `main.js`'s `ALLOWED_PYTHON_COMMANDS`, το δεύτερο gate που ξεχνιέται εύκολα, βλ.
+`run-intake-tool` SKILL.md's Gotchas) και η ίδια η σελίδα (`src/pages/pools/`, νέο
+nav-item «Αποθέματα» δίπλα στα «Τιμολόγια»). Commit `05f3814`.
+
+Δοκιμάστηκε πλήρως σε throwaway αντίγραφο βάσης (Playwright `_electron`, ίδιο
+driver-πρότυπο με το `run-intake-tool` skill, custom script αφού το invoicebook δεν έχει
+ακόμα δικό του project skill): pool card renders σωστά, `add_allocation` μειώνει live το
+`remaining_quantity` (1000→850 στη δοκιμή), το modal «Κλείσιμο με Υπόλοιπο» ανοίγει/
+κλείνει σωστά, μηδέν console/page errors. Το πραγματικό `invoicebook.db` επιβεβαιωμένα
+ανέγγιχτο μετά (md5 ίδιο πριν/μετά).
+
+Το intake-tool κρατάει το δικό του pools tab αμετάβλητο — καμία αφαίρεση, όπως συμφωνήθηκε
+2026-09-19.
+
 ## [intake-tool] Συμπιεσμένα αντίγραφα βάσης στο backup (2026-09-23)
 
 Ερώτηση χρήστη «γιατί καθυστερεί το backup εδώ» (το κλείσιμο των 13:10 πήρε 92″, ένα
