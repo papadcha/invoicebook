@@ -135,6 +135,7 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'list_invoice_items_by_category', 'get_flagged_invoices', 'get_invoice_status_summary',
   'review_flagged_invoice', 'unreview_flagged_invoice',
   'update_invoice_from_data', 'delete_invoice_item', 'split_invoice_item',
+  'expvault_export_preview', 'expvault_export_write',
   'list_open_bulk_pools', 'add_allocation', 'close_bulk_pool', 'delete_bulk_pool',
   'get_summary',
 ]);
@@ -157,6 +158,14 @@ function setupIPC() {
       properties: ['openFile'],
     });
     return canceled ? null : filePaths[0];
+  });
+
+  ipcMain.handle('save-json-dialog', async (event, defaultName) => {
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: defaultName || 'export.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    return canceled ? null : filePath;
   });
 
   ipcMain.handle('open-pdf-dialog', async () => {

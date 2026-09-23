@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('api', {
   call:        (cmd, payload = {}) => ipcRenderer.invoke('python', cmd, payload),
   openImportFile: ()               => ipcRenderer.invoke('open-import-dialog'),
   pickPdfFile:    ()               => ipcRenderer.invoke('open-pdf-dialog'),
+  saveJsonFile:   (defaultName)    => ipcRenderer.invoke('save-json-dialog', defaultName),
   openStoredFile: (filename)       => ipcRenderer.invoke('open-stored-file', filename),
   openLocalFile:  (filePath)       => ipcRenderer.invoke('open-local-file', filePath),
   minimize:    () => ipcRenderer.send('window-minimize'),

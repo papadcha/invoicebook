@@ -1,0 +1,20 @@
+<div class="page-header">
+  <h2>💥 Εκρηκτικά → expvault</h2>
+  <p>Φτιάχνει αρχείο JSON με τις γραμμές κατηγορίας «Εκρηκτικά» για την «Εισαγωγή JSON/CSV» του expvault.</p>
+</div>
+
+<div class="card">
+  <div class="card-title">Εξαγωγή εκρηκτικών για το expvault</div>
+  <p class="muted-sm" style="margin-bottom:14px;">
+    Μόνο ποσότητες, χωρίς τιμές. <b>ΑΠΟ ΦΥΛΑΞΗ → ΕΙΣΑΓΩΓΗ</b>, <b>ΠΡΟΣ ΦΥΛΑΞΗ → ΕΠΙΣΤΡΟΦΗ</b>
+    (με παρατήρηση στο βιβλίο)· για τα έγγραφα φύλαξης έλεγξε την κατεύθυνση στο PDF (📄) πριν
+    την εξαγωγή. Οι επιστροφές συνδέονται με την αγορά τους μέσα στο expvault, όπως πάντα.
+    Διόρθωση τιμολογίου/γραμμής γίνεται από την «Περιήγηση».
+  </p>
+  <div class="form-row cols-3" style="max-width:560px;align-items:end;">
+    <div class="field-inline"><label for="xv-date-from">Από</label><input type="date" id="xv-date-from"></div>
+    <div class="field-inline"><label for="xv-date-to">Έως</label><input type="date" id="xv-date-to"></div>
+    <div><button type="button" class="btn btn-outline" id="xv-preview-btn">Προεπισκόπηση</button></div>
+  </div>
+  <div id="xv-preview" style="margin-top:16px;"></div>
+</div>

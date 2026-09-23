@@ -28,6 +28,7 @@ os.makedirs(_data_dir, exist_ok=True)
 DB_PATH = os.environ.get('INVOICES_DB_PATH') or os.path.join(_data_dir, 'invoicebook.db')
 
 import database
+import expvault_export
 database.DB_NAME = DB_PATH
 database.PDF_STORE_DIR = os.path.join(os.path.dirname(DB_PATH), 'pdf_store')
 database.initialize_database()
@@ -223,6 +224,16 @@ def handle(cmd, payload):
 
     if cmd == 'split_invoice_item':
         return database.split_invoice_item(_int_id(payload, 'item_id'), payload['splits'])
+
+    # ── ΕΚΡΗΚΤΙΚΑ → expvault ─────────────────────────────────────────────────
+    if cmd == 'expvault_export_preview':
+        return expvault_export.preview(database, payload.get('date_from'), payload.get('date_to'))
+
+    if cmd == 'expvault_export_write':
+        return expvault_export.export_to_file(
+            database, payload['path'], payload.get('date_from'), payload.get('date_to'),
+            payload.get('tipos_overrides'), payload.get('exclude_ids'),
+        )
 
     # ── ΑΠΟΘΕΜΑΤΑ ΠΡΟΣ ΔΙΑΜΟΙΡΑΣΜΟ ────────────────────────────────────────────
     if cmd == 'list_open_bulk_pools':

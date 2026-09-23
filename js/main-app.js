@@ -43,6 +43,7 @@ const Pages = {
   invoices:  { html: 'src/pages/invoices/invoices.html',   js: 'src/pages/invoices/invoices.js' },
   pools:     { html: 'src/pages/pools/pools.html',         js: 'src/pages/pools/pools.js' },
   browse:    { html: 'src/pages/browse/browse.html',       js: 'src/pages/browse/browse.js' },
+  explosives: { html: 'src/pages/explosives/explosives.html', js: 'src/pages/explosives/explosives.js' },
   suppliers: { html: 'src/pages/suppliers/suppliers.html', js: 'src/pages/suppliers/suppliers.js' },
   import:    { html: 'src/pages/import/import.html',       js: 'src/pages/import/import.js' },
   merges:    { html: 'src/pages/merges/merges.html',       js: 'src/pages/merges/merges.js' },
