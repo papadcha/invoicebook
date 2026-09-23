@@ -196,6 +196,24 @@ def handle(cmd, payload):
         database.dismiss_merge_candidate(payload['kind'], payload['candidate_key'])
         return {'ok': True}
 
+    # ── ΑΠΟΘΕΜΑΤΑ ΠΡΟΣ ΔΙΑΜΟΙΡΑΣΜΟ ────────────────────────────────────────────
+    if cmd == 'list_open_bulk_pools':
+        return database.list_open_bulk_pools()
+
+    if cmd == 'add_allocation':
+        return database.add_allocation(
+            _int_id(payload, 'pool_id'), payload.get('machine_name'), payload['quantity'],
+            payload['allocation_date'], payload.get('notes')
+        )
+
+    if cmd == 'close_bulk_pool':
+        database.close_bulk_pool(_int_id(payload, 'pool_id'), payload.get('note'))
+        return {'ok': True}
+
+    if cmd == 'delete_bulk_pool':
+        database.delete_bulk_pool(_int_id(payload, 'pool_id'))
+        return {'ok': True}
+
     # ── ΑΝΑΦΟΡΕΣ ──────────────────────────────────────────────────────────────
     if cmd == 'get_summary':
         return database.get_summary(payload.get('year'), payload.get('month'))

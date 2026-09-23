@@ -1,0 +1,27 @@
+<div class="card">
+  <div class="card-title">Αποθέματα προς Διαμοιρασμό</div>
+  <p class="muted-sm" style="margin-bottom:14px;">
+    Γραμμές που σημειώθηκαν "μαζική/bulk" κατά την εισαγωγή (π.χ. δεξαμενή πετρελαίου) —
+    κατένειμέ τες σταδιακά σε μηχανήματα καθώς καταναλώνονται.
+  </p>
+  <div id="pools-list"></div>
+</div>
+
+<!-- ── MODAL: ΚΛΕΙΣΙΜΟ ΜΕ ΥΠΟΛΟΙΠΟ ── -->
+<div class="modal-overlay" id="close-pool-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-title">Κλείσιμο με Υπόλοιπο</div>
+    <input type="hidden" id="close-pool-id">
+    <p class="muted-sm" style="margin-bottom:10px;">Απομένει ποσότητα αδιάθετη — γράψε γιατί (π.χ. εξάτμιση, διαρροή, αδιάθετο).</p>
+    <div class="form-row">
+      <div>
+        <label for="close-pool-note">Σημείωση</label>
+        <input type="text" id="close-pool-note" placeholder="π.χ. Εξάτμιση/διαρροή">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="close-pool-cancel-btn">Άκυρο</button>
+      <button class="btn btn-primary" id="close-pool-ok-btn">Κλείσιμο</button>
+    </div>
+  </div>
+</div>

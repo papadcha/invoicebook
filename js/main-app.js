@@ -41,6 +41,7 @@ window.pyCallStrict = pyCallStrict;
 const Pages = {
   dashboard: { html: 'src/pages/dashboard/dashboard.html', js: 'src/pages/dashboard/dashboard.js' },
   invoices:  { html: 'src/pages/invoices/invoices.html',   js: 'src/pages/invoices/invoices.js' },
+  pools:     { html: 'src/pages/pools/pools.html',         js: 'src/pages/pools/pools.js' },
   suppliers: { html: 'src/pages/suppliers/suppliers.html', js: 'src/pages/suppliers/suppliers.js' },
   import:    { html: 'src/pages/import/import.html',       js: 'src/pages/import/import.js' },
   merges:    { html: 'src/pages/merges/merges.html',       js: 'src/pages/merges/merges.js' },

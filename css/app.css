@@ -68,6 +68,14 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); min-
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 20px; }
 .card-title { font-size: 12px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--navy2); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 
+/* ── POOLS (Αποθέματα προς Διαμοιρασμό) ── */
+.pool-card { border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+.pool-card-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.pool-card-header b { color: var(--navy2); }
+.pool-remaining { font-family: var(--mono); font-size: 14px; }
+.pool-alloc-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px; }
+.pool-alloc-row > div { flex: 1; min-width: 110px; }
+
 /* ── GRID ── */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
