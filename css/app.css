@@ -91,6 +91,7 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); min-
 .field-inline input { flex: 1; min-width: 0; }
 .field-inline-group { display: flex; gap: 12px; }
 .field-inline-group .field-inline { flex: 1; }
+.picker-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 label { font-size: 11px; font-weight: 600; color: var(--navy2); letter-spacing: 0.5px; display: block; margin-bottom: 5px; }
 input, select, textarea {
   width: 100%; padding: 8px 11px; border: 1px solid var(--border);

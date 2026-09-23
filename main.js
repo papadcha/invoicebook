@@ -140,7 +140,10 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'review_flagged_invoice', 'unreview_flagged_invoice',
   'update_invoice_from_data', 'delete_invoice_item', 'split_invoice_item',
   'expvault_export_preview', 'expvault_export_write',
-  'get_backup_config', 'run_backup',
+  'get_backup_config', 'run_backup', 'save_backup_config',
+  'list_backups', 'restore_backup', 'list_pdf_archives', 'run_pdf_archive_now',
+  'restore_pdf_store', 'list_rclone_remotes', 'list_remotes_detail', 'delete_remote',
+  'list_manual_snapshots', 'prune_manual_snapshots',
   'list_open_bulk_pools', 'add_allocation', 'close_bulk_pool', 'delete_bulk_pool',
   'get_summary',
 ]);
@@ -191,6 +194,48 @@ function setupIPC() {
   ipcMain.handle('open-local-file', async (event, filePath) => {
     const err = await shell.openPath(filePath);
     return err ? { ok: false, error: err } : { ok: true };
+  });
+
+  ipcMain.handle('open-dir-dialog', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    return canceled ? null : filePaths[0];
+  });
+
+  // Port από intake-tool/main.js — ανοίγει terminal με `rclone config` για να προσθέσει/
+  // διαχειριστεί ο χρήστης cloud remotes (OAuth flow δεν μπορεί να τρέξει headless από εδώ).
+  // rclone είναι ήδη εγκατεστημένο system-wide σε αυτό το μηχάνημα.
+  ipcMain.handle('open-rclone-terminal', async () => {
+    function trySpawn(cmd, args, opts = {}) {
+      return new Promise((resolve) => {
+        try {
+          const child = spawn(cmd, args, { detached: true, stdio: 'ignore', ...opts });
+          child.on('error', () => resolve(false));
+          child.unref();
+          setTimeout(() => resolve(true), 200);
+        } catch { resolve(false); }
+      });
+    }
+    if (os.platform() === 'win32') {
+      const attempts = [
+        ['wt.exe', ['powershell', '-NoExit', '-Command', 'rclone config']],
+        ['powershell.exe', ['-NoExit', '-Command', 'rclone config']],
+        ['cmd.exe', ['/K', 'rclone config']],
+      ];
+      for (const [cmd, args] of attempts) {
+        if (await trySpawn(cmd, args, { shell: false })) return { ok: true };
+      }
+      return { ok: false, error: 'Δεν βρέθηκε terminal — εκτελέστε χειροκίνητα: rclone config' };
+    }
+    const attempts = [
+      ['x-terminal-emulator', ['-e', 'rclone', 'config']],
+      ['xterm', ['-e', 'rclone', 'config']],
+    ];
+    for (const [cmd, args] of attempts) {
+      if (await trySpawn(cmd, args)) return { ok: true };
+    }
+    return { ok: false, error: 'Δεν βρέθηκε terminal — εκτελέστε χειροκίνητα: rclone config' };
   });
 
   ipcMain.on('window-minimize', () => mainWindow?.minimize());

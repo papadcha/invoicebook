@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('api', {
   saveJsonFile:   (defaultName)    => ipcRenderer.invoke('save-json-dialog', defaultName),
   openStoredFile: (filename)       => ipcRenderer.invoke('open-stored-file', filename),
   openLocalFile:  (filePath)       => ipcRenderer.invoke('open-local-file', filePath),
+  openDir:        ()               => ipcRenderer.invoke('open-dir-dialog'),
+  openRcloneTerminal: ()           => ipcRenderer.invoke('open-rclone-terminal'),
   onBackupProgress: (cb)           => ipcRenderer.on('backup-progress', (event, status, data) => cb(status, data)),
   minimize:    () => ipcRenderer.send('window-minimize'),
   maximize:    () => ipcRenderer.send('window-maximize'),

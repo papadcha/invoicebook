@@ -1,0 +1,73 @@
+<div class="page-header">
+  <h2>⚙ Ρυθμίσεις</h2>
+  <p>Αντίγραφα ασφαλείας — προορισμοί, ιστορικό, restore. Το backup-on-close τρέχει αυτόματα στο κλείσιμο του παραθύρου.</p>
+</div>
+
+<div class="card">
+  <div class="card-title">Αντίγραφα Ασφαλείας</div>
+  <p class="muted-sm">
+    Τρέχει αυτόματα κάθε φορά που κλείνεις το πρόγραμμα (αν έχεις ορίσει τουλάχιστον
+    έναν προορισμό) — αντιγράφει το invoicebook.db (με ιστορικό, τελευταία <span id="bk-maxkeep-label">20</span>)
+    και προσθετικά ό,τι νέο έχει μπει στο pdf_store. Μπορείς να προσθέσεις τοπικό
+    φάκελο, δικτυακό (NAS) φάκελο, ή cloud (rclone) — όσους θέλεις μαζί. Ίδιο αρχείο
+    ρυθμίσεων με το intake-tool (δίπλα στη βάση) — αλλαγή εδώ ισχύει και εκεί.
+  </p>
+  <div id="bk-paths-list"></div>
+  <button type="button" class="btn btn-outline btn-sm" id="bk-add-path-btn">+ Προορισμός</button>
+  <div class="form-row" style="margin-top:16px; max-width:220px;">
+    <div>
+      <label for="bk-maxkeep">Πλήθος αντιγράφων DB προς διατήρηση (ανά προορισμό)</label>
+      <input type="number" id="bk-maxkeep" min="1" max="365" value="20">
+    </div>
+  </div>
+  <div class="form-actions" style="margin-top:16px;">
+    <button type="button" class="btn btn-outline" id="bk-save-btn">Αποθήκευση Ρυθμίσεων</button>
+    <button type="button" class="btn btn-primary" id="bk-now-btn">▶ Backup Τώρα</button>
+  </div>
+  <p id="bk-last-status" class="muted-sm" style="margin-top:12px; display:none;"></p>
+</div>
+
+<div class="card">
+  <div class="card-title">Χειροκίνητα Αντίγραφα πριν από Edits (.bak-*)</div>
+  <p class="muted-sm">
+    Ξεχωριστό από το αυτόματο backup παραπάνω — αυτά δημιουργούνται χειροκίνητα
+    (π.χ. μέσω <code>invoices/backend/snapshot_before_edit.py</code>) πριν από ένα
+    ρίσκο edit στο invoicebook.db μέσα σε συνεδρία. Καθαρίζονται αυτόματα στα
+    τελευταία <span id="manual-snap-keep-label">30</span> κάθε φορά που τρέχει το
+    script — αλλά αν κάποιο edit έγινε χωρίς αυτό, μπορεί να συσσωρευτούν παραπάνω.
+  </p>
+  <p id="manual-snap-status" class="muted-sm"></p>
+  <div id="manual-snap-warning" style="display:none; background:#fff3cd; color:#856404; border:1px solid #ffe69c; border-radius:6px; padding:10px 14px; margin:10px 0; font-weight:600;">
+    ⚠ Έχουν συσσωρευτεί αρκετά αντίγραφα — σκέψου να τα καθαρίσεις.
+  </div>
+  <div class="form-actions">
+    <button type="button" class="btn btn-outline btn-sm" id="manual-snap-clean-btn">🧹 Καθάρισε παλιά</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Cloud Remotes (rclone)</div>
+  <p class="muted-sm">Το rclone διαχειρίζεται τις συνδέσεις με cloud υπηρεσίες (Google Drive, Mega, κ.λπ.) — η σύνδεση γίνεται μία φορά, εκτός εφαρμογής.</p>
+  <div id="bk-remotes-table"></div>
+  <button type="button" class="btn btn-outline btn-sm" id="bk-new-remote-btn" style="margin-top:10px;">+ Νέο Remote</button>
+</div>
+
+<div class="card">
+  <div class="card-title">Ιστορικό Αντιγράφων</div>
+  <div id="bk-history"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">Πλήρες Αρχείο pdf_store</div>
+  <p class="muted-sm">
+    Ξεχωριστό, λιγότερο συχνό (κάθε λίγες μέρες) πλήρες συμπιεσμένο αντίγραφο
+    ολόκληρου του pdf_store — για γρήγορη πλήρη ανάκτηση σε έκτακτη ανάγκη
+    (χαμένος τοπικός φάκελος, restore από NAS). Δεν αντικαθιστά το καθημερινό
+    προσθετικό αντίγραφο παραπάνω, το συμπληρώνει. Τρέχει αυτόματα μαζί με κάθε
+    backup όταν είναι η ώρα του.
+  </p>
+  <div id="bk-pdf-archive-list"></div>
+  <div class="form-actions" style="margin-top:10px;">
+    <button type="button" class="btn btn-outline btn-sm" id="bk-pdf-archive-now-btn">📦 Δημιουργία Τώρα (χωρίς αναμονή)</button>
+  </div>
+</div>

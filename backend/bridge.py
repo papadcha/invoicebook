@@ -247,6 +247,39 @@ def handle(cmd, payload):
     if cmd == 'run_backup':
         return backup.run_all_backups(payload.get('reason'))
 
+    if cmd == 'save_backup_config':
+        return backup.save_config(payload.get('paths') or [], payload.get('max_keep', 20))
+
+    if cmd == 'list_backups':
+        return backup.list_backups(payload['folder'])
+
+    if cmd == 'restore_backup':
+        return backup.restore_backup(payload['path'])
+
+    if cmd == 'list_pdf_archives':
+        return backup.list_pdf_archives(payload['folder'])
+
+    if cmd == 'run_pdf_archive_now':
+        return backup.run_pdf_archive_now()
+
+    if cmd == 'restore_pdf_store':
+        return backup.restore_pdf_store(payload['path'])
+
+    if cmd == 'list_rclone_remotes':
+        return backup.list_rclone_remotes()
+
+    if cmd == 'list_remotes_detail':
+        return backup.list_remotes_detail()
+
+    if cmd == 'delete_remote':
+        return backup.delete_remote(payload['name'])
+
+    if cmd == 'list_manual_snapshots':
+        return backup.list_manual_snapshots()
+
+    if cmd == 'prune_manual_snapshots':
+        return backup.prune_manual_snapshots()
+
     # ── ΑΠΟΘΕΜΑΤΑ ΠΡΟΣ ΔΙΑΜΟΙΡΑΣΜΟ ────────────────────────────────────────────
     if cmd == 'list_open_bulk_pools':
         return database.list_open_bulk_pools()

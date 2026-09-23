@@ -49,6 +49,7 @@ const Pages = {
   suppliers: { html: 'src/pages/suppliers/suppliers.html', js: 'src/pages/suppliers/suppliers.js' },
   import:    { html: 'src/pages/import/import.html',       js: 'src/pages/import/import.js' },
   merges:    { html: 'src/pages/merges/merges.html',       js: 'src/pages/merges/merges.js' },
+  settings:  { html: 'src/pages/settings/settings.html',   js: 'src/pages/settings/settings.js' },
 };
 
 function loadFile(url) {
