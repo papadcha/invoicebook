@@ -132,6 +132,7 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'get_unit_variants', 'merge_units',
   'get_pdf_store_report', 'delete_orphan_pdfs', 'find_invoices_with_same_pdf',
   'dismiss_merge_candidate',
+  'list_invoice_items_by_category', 'get_flagged_invoices', 'get_invoice_status_summary',
   'list_open_bulk_pools', 'add_allocation', 'close_bulk_pool', 'delete_bulk_pool',
   'get_summary',
 ]);

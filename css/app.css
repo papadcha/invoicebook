@@ -34,6 +34,7 @@
   --accent:  #e8a020;
   --accent2: #f5c060;
   --danger:  #c0392b;
+  --warning: #a16207;
   --success: #1a7a4a;
   --bg:      #f4f6f9;
   --surface: #ffffff;
@@ -85,6 +86,11 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); min-
 .form-row.cols-2 { grid-template-columns: 1fr 1fr; }
 .form-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
 .form-row.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.field-inline { display: flex; align-items: center; gap: 8px; }
+.field-inline label { margin-bottom: 0; white-space: nowrap; flex-shrink: 0; cursor: help; }
+.field-inline input { flex: 1; min-width: 0; }
+.field-inline-group { display: flex; gap: 12px; }
+.field-inline-group .field-inline { flex: 1; }
 label { font-size: 11px; font-weight: 600; color: var(--navy2); letter-spacing: 0.5px; display: block; margin-bottom: 5px; }
 input, select, textarea {
   width: 100%; padding: 8px 11px; border: 1px solid var(--border);
@@ -126,6 +132,11 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
 .table-compact tbody td { padding: 1px 12px; line-height: 1.1; }
 .table-compact tbody td .btn-sm { padding: 2px 8px; font-size: 10.5px; }
 .table-compact tbody td input[type="checkbox"] { margin: 0; }
+tbody tr.sev-duplicate td, tbody tr.sev-severe td { color: var(--danger); font-weight: 600; }
+tbody tr.sev-moderate td { color: var(--warning); }
+tbody tr.sev-reviewed td { color: var(--muted); }
+.control-cell { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.row-actions { white-space: nowrap; display: inline-flex; gap: 4px; }
 
 /* ── ΕΙΣΑΓΩΓΗ: μάζεμα άνω τμήματος για χώρο στη λίστα αναμονής ── */
 #new-import-card { padding: 12px 24px; margin-bottom: 12px; }
@@ -162,6 +173,15 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
 .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; text-align: center; }
 .stat-card .stat-val { font-size: 26px; font-weight: 600; font-family: var(--mono); color: var(--navy2); }
 .stat-card .stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; letter-spacing: 0.5px; text-transform: uppercase; }
+.stat-card.sev-danger .stat-val { color: var(--danger); }
+.stat-card.sev-warning .stat-val { color: var(--warning); }
+.stat-clickable { cursor: pointer; }
+.stat-clickable:hover { border-color: var(--navy3); background: #f0f4f9; }
+.stat-active { border-color: var(--accent) !important; background: #fff8ea !important; }
+.stats-grid-sm { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.stats-grid-sm .stat-card { padding: 10px 8px; }
+.stats-grid-sm .stat-card .stat-val { font-size: 18px; }
+.stats-grid-sm .stat-card .stat-label { font-size: 9.5px; margin-top: 2px; }
 
 /* ── FILTER BAR ── */
 .filter-bar { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }

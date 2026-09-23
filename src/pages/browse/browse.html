@@ -1,0 +1,41 @@
+<div class="page-header">
+  <h2>Περιήγηση</h2>
+  <p>Αναζήτηση/φιλτράρισμα σε επίπεδο γραμμής τιμολογίου, με στατιστικά ελέγχου — read-only προς το παρόν, χωρίς επεξεργασία.</p>
+</div>
+
+<div class="card">
+  <div class="card-title">Έλεγχος</div>
+  <div class="stats-grid stats-grid-sm" id="status-stats-grid"></div>
+  <div class="stats-grid stats-grid-sm" id="status-category-grid"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">Περιήγηση</div>
+  <div class="form-row cols-2">
+    <div class="field-inline">
+      <label for="browse-search" title="προμηθευτής / ΑΦΜ / αρ. παραστ. / μηχάνημα / ημερομηνία / περιγραφή / κατηγορία — χώρισε πολλούς όρους με , ή ; για ΚΑΙ">Αναζήτηση</label>
+      <input type="text" id="browse-search" placeholder="π.χ. Ζεϊμπέκης Αθανάσιος, 2026-08 ή JCB123; DIESEL">
+    </div>
+    <div class="field-inline-group">
+      <div class="field-inline">
+        <label for="browse-date-from">Από</label>
+        <input type="date" id="browse-date-from">
+      </div>
+      <div class="field-inline">
+        <label for="browse-date-to">Έως</label>
+        <input type="date" id="browse-date-to">
+      </div>
+    </div>
+  </div>
+  <div id="browse-result-note" style="font-size:12px;color:var(--muted);margin-bottom:6px;"></div>
+  <div class="table-wrap">
+    <table id="browse-table">
+      <thead><tr>
+        <th>Ημ/νία</th><th>Προμηθευτής</th><th>Αρ.Παραστ.</th><th>Κατηγορία</th>
+        <th>Περιγραφή</th><th class="text-right">Ποσότητα</th><th>Μηχάνημα</th><th>ΕΦΚ</th><th>Έλεγχος</th><th></th>
+      </tr></thead>
+      <tbody id="browse-body"></tbody>
+    </table>
+  </div>
+  <div id="browse-pagination" style="display:flex;align-items:center;gap:10px;margin-top:10px;"></div>
+</div>
