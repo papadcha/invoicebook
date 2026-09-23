@@ -1,6 +1,6 @@
 <div class="page-header">
   <h2>Περιήγηση</h2>
-  <p>Αναζήτηση/φιλτράρισμα σε επίπεδο γραμμής τιμολογίου, με στατιστικά ελέγχου — προς το παρόν μόνο επιθεώρηση/αναίρεση, καμία επεξεργασία τιμολογίου/γραμμής ακόμα.</p>
+  <p>Αναζήτηση/φιλτράρισμα σε επίπεδο γραμμής τιμολογίου, με στατιστικά ελέγχου, επιθεώρηση/αναίρεση και πλήρη επεξεργασία τιμολογίου/γραμμών.</p>
 </div>
 
 <div class="card">
@@ -55,6 +55,134 @@
     <div class="modal-actions">
       <button class="btn btn-outline" id="review-cancel-btn">Άκυρο</button>
       <button class="btn btn-primary" id="review-ok-btn">Επιθεώρηση</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: ΔΙΟΡΘΩΣΗ ΤΙΜΟΛΟΓΙΟΥ ── -->
+<div class="modal-overlay" id="edit-invoice-modal">
+  <div class="modal" style="max-width:1080px;">
+    <div class="modal-title">Διόρθωση Τιμολογίου</div>
+    <input type="hidden" id="edit-invoice-id">
+    <div class="form-row cols-2">
+      <div>
+        <label for="edit-supplier-name">Προμηθευτής</label>
+        <input type="text" id="edit-supplier-name">
+        <div id="edit-supplier-warning" class="muted-sm" style="display:none; margin-top:4px;"></div>
+      </div>
+      <div>
+        <label for="edit-supplier-vat">ΑΦΜ Προμηθευτή</label>
+        <input type="text" id="edit-supplier-vat">
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div>
+        <label for="edit-doc-type">Τύπος Παραστατικού</label>
+        <input type="text" id="edit-doc-type">
+      </div>
+      <div>
+        <label for="edit-doc-number">Αρ. Παραστατικού</label>
+        <input type="text" id="edit-doc-number">
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div>
+        <label for="edit-doc-date">Ημερομηνία</label>
+        <input type="date" id="edit-doc-date">
+      </div>
+      <div>
+        <label for="edit-doc-time">Ώρα</label>
+        <input type="text" id="edit-doc-time">
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div>
+        <label for="edit-customer-name">Πελάτης</label>
+        <input type="text" id="edit-customer-name">
+      </div>
+      <div>
+        <label for="edit-customer-vat">ΑΦΜ Πελάτη</label>
+        <input type="text" id="edit-customer-vat">
+      </div>
+    </div>
+    <div class="form-row cols-3">
+      <div>
+        <label for="edit-customer-doy">ΔΟΥ Πελάτη</label>
+        <input type="text" id="edit-customer-doy">
+      </div>
+      <div>
+        <label for="edit-customer-address">Διεύθυνση Πελάτη</label>
+        <input type="text" id="edit-customer-address">
+      </div>
+      <div>
+        <label for="edit-customer-phone">Τηλέφωνο Πελάτη</label>
+        <input type="text" id="edit-customer-phone">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>PDF</label>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span id="edit-pdf-status" class="muted-sm">—</span>
+          <button type="button" class="btn btn-outline btn-sm" id="edit-pdf-open-btn" style="display:none;">Άνοιγμα</button>
+          <button type="button" class="btn btn-outline btn-sm" id="edit-pdf-attach-btn">Επισύναψη PDF</button>
+        </div>
+      </div>
+    </div>
+    <hr style="border:none; border-top:1px solid var(--border); margin:16px 0;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <p class="muted-sm" style="margin:0;">Γραμμές τιμολογίου:</p>
+      <button type="button" class="btn btn-outline btn-sm" id="edit-add-item-btn">+ Νέα γραμμή</button>
+    </div>
+    <div class="table-wrap" style="margin-bottom:16px;">
+      <table id="edit-items-table" class="items-table">
+        <thead><tr>
+          <th style="min-width:180px;">Περιγραφή</th>
+          <th style="min-width:130px;">Κατηγορία</th>
+          <th style="min-width:90px;">Ποσότητα</th>
+          <th style="min-width:70px;">Μονάδα</th>
+          <th style="min-width:100px;">Τιμή Μονάδας</th>
+          <th style="min-width:100px;">Αξία</th>
+          <th style="min-width:70px;">ΦΠΑ%</th>
+          <th style="min-width:120px;">Μηχάνημα</th>
+          <th style="min-width:50px;">ΕΦΚ</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="edit-items-body"></tbody>
+      </table>
+    </div>
+    <div class="form-row cols-2">
+      <div>
+        <label for="edit-payment-method">Τρόπος Πληρωμής</label>
+        <input type="text" id="edit-payment-method">
+      </div>
+      <div>
+        <label for="edit-notes">Παρατηρήσεις</label>
+        <input type="text" id="edit-notes">
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div>
+        <label for="edit-net-amount">Καθ. Αξία</label>
+        <input type="number" step="0.01" id="edit-net-amount">
+      </div>
+      <div>
+        <label for="edit-vat-amount">ΦΠΑ</label>
+        <input type="number" step="0.01" id="edit-vat-amount">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label for="edit-total-amount">Σύνολο</label>
+        <input type="number" step="0.01" id="edit-total-amount">
+      </div>
+    </div>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <button class="btn btn-danger" id="edit-invoice-delete-btn">Διαγραφή Τιμολογίου</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline" id="edit-invoice-cancel-btn">Άκυρο</button>
+        <button class="btn btn-primary" id="edit-invoice-save-btn">Αποθήκευση</button>
+      </div>
     </div>
   </div>
 </div>

@@ -137,6 +137,7 @@ tbody tr.sev-moderate td { color: var(--warning); }
 tbody tr.sev-reviewed td { color: var(--muted); }
 .control-cell { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
 .row-actions { white-space: nowrap; display: inline-flex; gap: 4px; }
+input.plate-warn { border-color: var(--warning); background: #fff8e6; }
 
 /* ── ΕΙΣΑΓΩΓΗ: μάζεμα άνω τμήματος για χώρο στη λίστα αναμονής ── */
 #new-import-card { padding: 12px 24px; margin-bottom: 12px; }

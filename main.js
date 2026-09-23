@@ -134,6 +134,7 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'dismiss_merge_candidate',
   'list_invoice_items_by_category', 'get_flagged_invoices', 'get_invoice_status_summary',
   'review_flagged_invoice', 'unreview_flagged_invoice',
+  'update_invoice_from_data', 'delete_invoice_item',
   'list_open_bulk_pools', 'add_allocation', 'close_bulk_pool', 'delete_bulk_pool',
   'get_summary',
 ]);

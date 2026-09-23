@@ -214,6 +214,13 @@ def handle(cmd, payload):
     if cmd == 'unreview_flagged_invoice':
         return database.remove_invoice_review(_int_id(payload, 'invoice_id'))
 
+    if cmd == 'update_invoice_from_data':
+        return {'id': database.update_invoice_from_data(_int_id(payload), payload['data'])}
+
+    if cmd == 'delete_invoice_item':
+        database.delete_invoice_item(_int_id(payload, 'item_id'))
+        return {'ok': True}
+
     # ── ΑΠΟΘΕΜΑΤΑ ΠΡΟΣ ΔΙΑΜΟΙΡΑΣΜΟ ────────────────────────────────────────────
     if cmd == 'list_open_bulk_pools':
         return database.list_open_bulk_pools()
