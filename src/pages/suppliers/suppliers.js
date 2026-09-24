@@ -45,6 +45,7 @@ function fillForm(s) {
   document.getElementById('sup-name').value = s.name || '';
   document.getElementById('sup-vat').value = s.vat_number || '';
   document.getElementById('sup-notes').value = s.notes || '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function clearForm() {

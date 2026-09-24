@@ -88,6 +88,9 @@ def handle(cmd, payload):
     if cmd == 'get_orphan_suppliers':
         return database.get_orphan_suppliers()
 
+    if cmd == 'get_suppliers_with_invalid_vat':
+        return database.get_suppliers_with_invalid_vat()
+
     if cmd == 'delete_orphan_suppliers':
         return database.delete_orphan_suppliers(payload['ids'])
 

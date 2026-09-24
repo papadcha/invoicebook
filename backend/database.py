@@ -237,6 +237,28 @@ def _hamming_close_vat(a, b):
     return 0 < diff <= 2
 
 
+def get_suppliers_with_invalid_vat():
+    """Δύο ξεχωριστές κατηγορίες: `bad_checksum` (ΑΦΜ με σωστό μήκος -- 9 ψηφία μετά
+    από _normalize_vat -- αλλά λάθος ψηφίο ελέγχου, άρα σίγουρα λάθος καταχωρημένο) και
+    `bad_length` (δεν βγαίνουν καθόλου 9 ψηφία -- συνήθως typo/OCR error, αλλά θα
+    μπορούσε να είναι και γνήσιο αλλοδαπό ΑΦΜ που το ελληνικό mod-11 checksum δεν το
+    ελέγχει καν, γι' αυτό μένει ξεχωριστή, λιγότερο σίγουρη κατηγορία)."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, name, vat_number, notes FROM tbl_suppliers "
+            "WHERE vat_number IS NOT NULL AND TRIM(vat_number) <> '' ORDER BY name"
+        ).fetchall()
+    bad_checksum, bad_length = [], []
+    for r in rows:
+        norm = _normalize_vat(r['vat_number'])
+        if norm and re.fullmatch(r'\d{9}', norm):
+            if _vat_checksum_valid(norm) is False:
+                bad_checksum.append(dict(r))
+        else:
+            bad_length.append(dict(r))
+    return {'bad_checksum': bad_checksum, 'bad_length': bad_length}
+
+
 def get_supplier_merge_candidates():
     """Υποψήφιοι προς συγχώνευση προμηθευτές, σε δύο βαθμίδες εμπιστοσύνης:
     STRONG (κοντινά ΑΦΜ όπου το checksum λύνει ποιο είναι σωστό, ΚΑΙ επιπλέον

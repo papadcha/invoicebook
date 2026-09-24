@@ -7,7 +7,7 @@ document.querySelectorAll('.subtab[data-subtab]').forEach(btn => btn.addEventLis
   const tab = btn.dataset.subtab;
   document.querySelectorAll('.subtab[data-subtab]').forEach(b => b.classList.toggle('active', b === btn));
   document.querySelectorAll('.subtab-panel').forEach(p => p.style.display = (p.id === `panel-${tab}` ? '' : 'none'));
-  if (tab === 'suppliers' && !loaded.suppliers) { loaded.suppliers = true; loadSupplierCandidates(); loadOrphanSuppliers(); }
+  if (tab === 'suppliers' && !loaded.suppliers) { loaded.suppliers = true; loadSupplierCandidates(); loadOrphanSuppliers(); loadInvalidVatSuppliers(); }
   if (tab === 'machines' && !loaded.machines) { loaded.machines = true; loadMachineCandidates(); loadOrphanMachines(); loadPlateMachines(); }
   if (tab === 'descriptions' && !loaded.descriptions) { loaded.descriptions = true; loadDescriptionCandidates(); }
   if (tab === 'units' && !loaded.units) { loaded.units = true; loadUnitVariants(); }
@@ -364,6 +364,32 @@ async function loadOrphanSuppliers() {
   });
 }
 
+function invalidVatTable(rows) {
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Προμηθευτής</th><th>ΑΦΜ</th><th>Σημείωση</th></tr></thead>
+    <tbody>${rows.map(s => `
+      <tr>
+        <td>${escapeHtml(s.name)}</td>
+        <td class="mono">${escapeHtml(s.vat_number)}</td>
+        <td class="muted-sm">${escapeHtml(s.notes || '—')}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+}
+
+async function loadInvalidVatSuppliers() {
+  const el = document.getElementById('invalid-vat-list');
+  el.innerHTML = '<p class="muted-sm">Φόρτωση…</p>';
+  const result = await pyCall('get_suppliers_with_invalid_vat') || { bad_checksum: [], bad_length: [] };
+  const { bad_checksum: badChecksum, bad_length: badLength } = result;
+  if (!badChecksum.length && !badLength.length) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>Κανένα πρόβλημα ΑΦΜ.</p></div>';
+    return;
+  }
+  el.innerHTML = `
+    ${badChecksum.length ? `<p class="muted-sm" style="margin-bottom:6px;"><b>Λάθος checksum (${badChecksum.length})</b></p>${invalidVatTable(badChecksum)}` : ''}
+    ${badLength.length ? `<p class="muted-sm" style="margin:14px 0 6px;"><b>Λάθος μήκος (${badLength.length})</b></p>${invalidVatTable(badLength)}` : ''}
+  `;
+}
+
 // ── ΠΕΡΙΓΡΑΦΕΣ ───────────────────────────────────────────────────────────────
 async function loadDescriptionCandidates() {
   const el = document.getElementById('description-candidates-list');
@@ -502,4 +528,5 @@ async function loadPdfReport() {
 
 loadSupplierCandidates();
 loadOrphanSuppliers();
+loadInvalidVatSuppliers();
 loaded.suppliers = true;
