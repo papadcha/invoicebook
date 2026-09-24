@@ -1436,6 +1436,12 @@ def _normalize_vat(v):
 
 
 def _find_or_create_supplier(conn, name, vat_number=None):
+    """Bug διορθώθηκε 2026-09-24: όταν η εγγραφή βρίσκεται από ΤΑΙΡΙΑΣΜΑ ΟΝΟΜΑΤΟΣ (το
+    νέο ΑΦΜ δεν ταίριαξε με καμία υπάρχουσα εγγραφή στο loop παραπάνω), ένα διορθωμένο
+    ΑΦΜ χανόταν σιωπηλά -- η συνάρτηση επέστρεφε το ήδη υπάρχον id χωρίς ποτέ να
+    ενημερώσει το vat_number του. Αφού το loop παραπάνω ήδη επιβεβαίωσε ότι ΚΑΝΕΝΑΣ
+    άλλος προμηθευτής δεν έχει αυτό το ΑΦΜ, είναι ασφαλές να το γράψουμε εδώ (καμία
+    σύγκρουση μοναδικότητας)."""
     if not name:
         return None
     row = None
@@ -1446,8 +1452,10 @@ def _find_or_create_supplier(conn, name, vat_number=None):
                 row = r
                 break
     if not row:
-        row = conn.execute('SELECT id FROM tbl_suppliers WHERE name=?', (name,)).fetchone()
+        row = conn.execute('SELECT id, vat_number FROM tbl_suppliers WHERE name=?', (name,)).fetchone()
     if row:
+        if vat_number and _normalize_vat(row['vat_number']) != norm_vat:
+            conn.execute('UPDATE tbl_suppliers SET vat_number=? WHERE id=?', (vat_number, row['id']))
         return row['id']
     cur = conn.execute(
         'INSERT INTO tbl_suppliers (name, vat_number) VALUES (?, ?)', (name, vat_number or None)
