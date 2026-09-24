@@ -7,7 +7,7 @@ document.querySelectorAll('.subtab[data-subtab]').forEach(btn => btn.addEventLis
   const tab = btn.dataset.subtab;
   document.querySelectorAll('.subtab[data-subtab]').forEach(b => b.classList.toggle('active', b === btn));
   document.querySelectorAll('.subtab-panel').forEach(p => p.style.display = (p.id === `panel-${tab}` ? '' : 'none'));
-  if (tab === 'suppliers' && !loaded.suppliers) { loaded.suppliers = true; loadSupplierCandidates(); }
+  if (tab === 'suppliers' && !loaded.suppliers) { loaded.suppliers = true; loadSupplierCandidates(); loadOrphanSuppliers(); }
   if (tab === 'machines' && !loaded.machines) { loaded.machines = true; loadMachineCandidates(); loadOrphanMachines(); loadPlateMachines(); }
   if (tab === 'descriptions' && !loaded.descriptions) { loaded.descriptions = true; loadDescriptionCandidates(); }
   if (tab === 'units' && !loaded.units) { loaded.units = true; loadUnitVariants(); }
@@ -315,6 +315,55 @@ async function loadOrphanMachines() {
   });
 }
 
+async function loadOrphanSuppliers() {
+  const el = document.getElementById('orphan-suppliers-list');
+  el.innerHTML = '<p class="muted-sm">Φόρτωση…</p>';
+  const orphans = await pyCall('get_orphan_suppliers') || [];
+  if (!orphans.length) { el.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>Κανένας ορφανός προμηθευτής.</p></div>'; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th style="width:32px;"><input type="checkbox" id="orphan-supplier-all" checked></th><th>Προμηθευτής</th><th>ΑΦΜ</th><th>Σημείωση</th></tr></thead>
+    <tbody>${orphans.map(s => `
+      <tr>
+        <td><input type="checkbox" class="orphan-supplier-cb" value="${s.id}" checked></td>
+        <td>${escapeHtml(s.name)}</td>
+        <td class="mono">${escapeHtml(s.vat_number || '—')}</td>
+        <td class="muted-sm">${escapeHtml(s.notes || '—')}</td>
+      </tr>`).join('')}</tbody></table></div>
+    <div class="form-actions"><button type="button" class="btn btn-danger" id="orphan-supplier-delete-btn"></button></div>`;
+
+  const btn = document.getElementById('orphan-supplier-delete-btn');
+  const boxes = [...el.querySelectorAll('.orphan-supplier-cb')];
+  const selectedIds = () => boxes.filter(b => b.checked).map(b => parseInt(b.value, 10));
+  const refreshBtn = () => {
+    const n = selectedIds().length;
+    btn.textContent = `Διαγραφή επιλεγμένων (${n})`;
+    btn.disabled = n === 0;
+  };
+  refreshBtn();
+
+  document.getElementById('orphan-supplier-all').addEventListener('change', e => {
+    boxes.forEach(b => { b.checked = e.target.checked; });
+    refreshBtn();
+  });
+  boxes.forEach(b => b.addEventListener('change', refreshBtn));
+
+  btn.addEventListener('click', async () => {
+    const ids = selectedIds();
+    if (!(await App.confirmAsync(`Οριστική διαγραφή ${ids.length} ορφανού/ών προμηθευτή/ών;`))) return;
+    const unlock = _lock(btn);
+    try {
+      const result = await pyCallStrict('delete_orphan_suppliers', { ids });
+      const skippedText = result.skipped ? ` (${result.skipped} παραλείφθηκαν — απέκτησαν τιμολόγιο εν τω μεταξύ)` : '';
+      App.toast(`Διαγράφηκαν ${result.deleted} προμηθευτής/ές${skippedText}`, 'ok');
+      window.reloadLookups();
+      loadOrphanSuppliers();
+    } catch (e) {
+      App.toast(e.message, 'fail');
+      unlock();
+    }
+  });
+}
+
 // ── ΠΕΡΙΓΡΑΦΕΣ ───────────────────────────────────────────────────────────────
 async function loadDescriptionCandidates() {
   const el = document.getElementById('description-candidates-list');
@@ -452,4 +501,5 @@ async function loadPdfReport() {
 }
 
 loadSupplierCandidates();
+loadOrphanSuppliers();
 loaded.suppliers = true;

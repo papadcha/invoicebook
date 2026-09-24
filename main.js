@@ -124,6 +124,7 @@ const RUN_BACKUP_TIMEOUT_MS = 45 * 60 * 1000; // 45 λεπτά
 // αν προστεθεί νέα εντολή εκεί, πρέπει να προστεθεί και εδώ αλλιώς αποτυγχάνει σιωπηλά.
 const ALLOWED_PYTHON_COMMANDS = new Set([
   'get_suppliers', 'add_supplier', 'update_supplier', 'delete_supplier',
+  'get_orphan_suppliers', 'delete_orphan_suppliers',
   'get_invoice', 'delete_invoice', 'attach_pdf',
   'import_staging_file', 'get_staging_batch', 'confirm_staging_row', 'reject_staging_row',
   'parse_import_file', 'stage_rows', 'list_categories', 'list_machines',

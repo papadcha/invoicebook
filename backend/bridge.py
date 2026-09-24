@@ -85,6 +85,12 @@ def handle(cmd, payload):
         database.delete_supplier(_int_id(payload))
         return {'ok': True}
 
+    if cmd == 'get_orphan_suppliers':
+        return database.get_orphan_suppliers()
+
+    if cmd == 'delete_orphan_suppliers':
+        return database.delete_orphan_suppliers(payload['ids'])
+
     # ── ΤΙΜΟΛΟΓΙΑ ─────────────────────────────────────────────────────────────
     if cmd == 'get_invoice':
         return database.get_invoice(_int_id(payload))

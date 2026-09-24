@@ -136,6 +136,40 @@ def delete_supplier(supplier_id):
         conn.execute('DELETE FROM tbl_suppliers WHERE id=?', (supplier_id,))
 
 
+# Ορφανός = καμία αναφορά από το tbl_invoices.supplier_id (μοναδικό FK προς
+# tbl_suppliers) -- συμβαίνει π.χ. όταν διορθώνεται το όνομα προμηθευτή σε ένα
+# τιμολόγιο (νέα εγγραφή φτιάχνεται, η παλιά μένει χωρίς καμία χρήση) ή όταν
+# διαγράφεται το τελευταίο τιμολόγιο ενός προμηθευτή. Ίδιο μοτίβο με
+# _ORPHAN_MACHINE_WHERE παρακάτω, απλά ένα μόνο FK εδώ αντί για δύο.
+_ORPHAN_SUPPLIER_WHERE = 'NOT EXISTS (SELECT 1 FROM tbl_invoices i WHERE i.supplier_id = s.id)'
+
+
+def get_orphan_suppliers():
+    with get_db() as conn:
+        rows = conn.execute(
+            f'SELECT s.id, s.name, s.vat_number, s.notes FROM tbl_suppliers s '
+            f'WHERE {_ORPHAN_SUPPLIER_WHERE} ORDER BY s.name'
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def delete_orphan_suppliers(ids):
+    """Ίδιο μοτίβο με delete_orphan_machines -- διαγράφει ΜΟΝΟ όσα από τα ids είναι
+    ακόμα ορφανά τη στιγμή της διαγραφής, ώστε ένας προμηθευτής που απέκτησε
+    τιμολόγιο μετά τη φόρτωση της λίστας να μη χαθεί."""
+    ids = [int(i) for i in ids]
+    if not ids:
+        return {'deleted': 0, 'skipped': 0}
+    placeholders = ','.join('?' * len(ids))
+    with get_db() as conn:
+        cur = conn.execute(
+            f'DELETE FROM tbl_suppliers WHERE id IN ({placeholders}) AND id IN '
+            f'(SELECT s.id FROM tbl_suppliers s WHERE {_ORPHAN_SUPPLIER_WHERE})',
+            ids
+        )
+    return {'deleted': cur.rowcount, 'skipped': len(ids) - cur.rowcount}
+
+
 # ── ΑΠΟΡΡΙΦΘΕΝΤΑ (Παράβλεψη) MERGE CANDIDATES — κοινό σε suppliers/machines/description ──
 # Το "Παράβλεψη" στο UI έδειχνε να δουλεύει αλλά ήταν καθαρά τοπικό στο DOM -- η
 # επόμενη φόρτωση της λίστας ξανάβρισκε το ίδιο candidate, αφού καμία απόφαση δεν
