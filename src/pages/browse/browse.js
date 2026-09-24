@@ -1,5 +1,5 @@
 import {
-  escapeHtml, fmtDate, fmtQty, _lock,
+  escapeHtml, fmtDate, fmtQty, _lock, todayInput,
   normalizeGreek, normalizeCategory, normalizeMachineCode, attachAutocomplete,
 } from '../../../js/utils.js';
 
@@ -314,6 +314,10 @@ document.getElementById('browse-search').addEventListener('input', () => {
 // αλλιώς το backend το διαβάζει σαν κενό και σβήνει τη σύνδεση από τη βάση σε
 // κάθε αποθήκευση (ίδιο bug με το intake-tool, 2026-08-23).
 let currentPdfFilename = null;
+// Απόλυτη διαδρομή PDF επιλεγμένου σε ΝΕΟ τιμολόγιο (δεν υπάρχει ακόμα invoice_id
+// για attach_pdf) — μένει σε αναμονή, επισυνάπτεται μετά το add_invoice_from_data
+// (ίδιο μοτίβο με το παλιό, πλέον καταργημένο «Τιμολόγια» tab).
+let pendingNewPdfPath = null;
 
 function refreshEditPdfStatus(r) {
   const status = document.getElementById('edit-pdf-status');
@@ -500,7 +504,10 @@ async function openEditInvoice(invoiceId) {
   const inv = await pyCall('get_invoice', { id: invoiceId });
   if (!inv) { App.toast('Δεν ήταν δυνατή η φόρτωση του τιμολογίου', 'fail'); return; }
   const supplier = (window.AppState.suppliers || []).find(s => s.id === inv.supplier_id);
+  pendingNewPdfPath = null;
   refreshEditPdfStatus(inv);
+  document.getElementById('edit-invoice-modal-title').textContent = `Διόρθωση Τιμολογίου #${inv.id}`;
+  document.getElementById('edit-invoice-delete-btn').style.display = '';
   document.getElementById('edit-invoice-id').value = inv.id;
   document.getElementById('edit-supplier-name').value = supplier ? supplier.name : '';
   document.getElementById('edit-supplier-vat').value = supplier ? (supplier.vat_number || '') : '';
@@ -523,6 +530,40 @@ async function openEditInvoice(invoiceId) {
   document.getElementById('edit-invoice-modal').classList.add('open');
 }
 
+// Ίδιο modal με το openEditInvoice, αλλά χωρίς invoice_id -- η αποθήκευση πάει σε
+// add_invoice_from_data αντί για update_invoice_from_data (βλ. edit-invoice-save-btn).
+// Καλύπτει ό,τι έκανε το παλιό, πλέον καταργημένο tab «Τιμολόγια» (βλ. TODO/DONE),
+// απλώς σπάνια χρειάζεται -- η πλειονότητα των τιμολογίων μπαίνει μέσω Εισαγωγή.
+function openNewInvoice() {
+  pendingNewPdfPath = null;
+  currentPdfFilename = null;
+  document.getElementById('edit-invoice-modal-title').textContent = 'Νέο Τιμολόγιο';
+  document.getElementById('edit-invoice-delete-btn').style.display = 'none';
+  document.getElementById('edit-invoice-id').value = '';
+  document.getElementById('edit-supplier-name').value = '';
+  document.getElementById('edit-supplier-vat').value = '';
+  document.getElementById('edit-doc-type').value = '';
+  document.getElementById('edit-doc-number').value = '';
+  document.getElementById('edit-doc-date').value = todayInput();
+  document.getElementById('edit-doc-time').value = '';
+  document.getElementById('edit-customer-name').value = '';
+  document.getElementById('edit-customer-vat').value = '';
+  document.getElementById('edit-customer-doy').value = '';
+  document.getElementById('edit-customer-address').value = '';
+  document.getElementById('edit-customer-phone').value = '';
+  document.getElementById('edit-payment-method').value = '';
+  document.getElementById('edit-notes').value = '';
+  document.getElementById('edit-net-amount').value = '';
+  document.getElementById('edit-vat-amount').value = '';
+  document.getElementById('edit-total-amount').value = '';
+  document.getElementById('edit-pdf-status').textContent = 'Κανένα αρχείο';
+  document.getElementById('edit-pdf-open-btn').style.display = 'none';
+  renderEditItemsTable([]);
+  refreshEditSupplierWarning();
+  document.getElementById('edit-invoice-modal').classList.add('open');
+}
+document.getElementById('new-invoice-btn').addEventListener('click', openNewInvoice);
+
 function closeEditModal() {
   document.getElementById('edit-invoice-modal').classList.remove('open');
 }
@@ -542,6 +583,14 @@ document.getElementById('edit-pdf-open-btn').addEventListener('click', async () 
 document.getElementById('edit-pdf-attach-btn').addEventListener('click', async () => {
   const filePath = await window.api.pickPdfFile();
   if (!filePath) return;
+  if (!document.getElementById('edit-invoice-id').value) {
+    // Νέο τιμολόγιο -- δεν υπάρχει ακόμα id για attach_pdf, αναβολή μέχρι το save
+    // (ίδιο μοτίβο με το παλιό, πλέον καταργημένο «Τιμολόγια» tab).
+    pendingNewPdfPath = filePath;
+    document.getElementById('edit-pdf-status').textContent = filePath.split(/[\\/]/).pop() + ' (θα επισυναφθεί μετά την αποθήκευση)';
+    document.getElementById('edit-pdf-open-btn').style.display = 'none';
+    return;
+  }
   if (currentPdfFilename && !(await App.confirmAsync(
     `Το τιμολόγιο έχει ήδη PDF («${currentPdfFilename}»). Αντικατάσταση; Το παλιό αρχείο θα σβηστεί.`
   ))) return;
@@ -561,11 +610,11 @@ document.getElementById('edit-pdf-attach-btn').addEventListener('click', async (
   }
 });
 
-// Αποθήκευση μέσω `update_invoice_from_data` (ΝΕΟ cmd σε αυτό το phase, ΔΕΝ
-// είναι το ήδη υπάρχον `update_invoice` που χρησιμοποιεί η σελίδα «Τιμολόγια»
-// με τελείως διαφορετικό payload σχήμα — βλ. σημείωση στο TODO/plan).
+// Αποθήκευση μέσω update_invoice_from_data (υπάρχον τιμολόγιο) ή
+// add_invoice_from_data (νέο, edit-invoice-id κενό -- βλ. openNewInvoice).
 document.getElementById('edit-invoice-save-btn').addEventListener('click', async () => {
-  const invoiceId = parseInt(document.getElementById('edit-invoice-id').value, 10);
+  const invoiceIdVal = document.getElementById('edit-invoice-id').value;
+  const isNew = !invoiceIdVal;
   const numOrNull = (v) => (v === '' ? null : parseFloat(v));
   const itemRows = Array.from(document.getElementById('edit-items-body').querySelectorAll('tr[data-item-row]'));
   const items = itemRows.map(tr => {
@@ -606,8 +655,24 @@ document.getElementById('edit-invoice-save-btn').addEventListener('click', async
   };
   const unlock = _lock(document.getElementById('edit-invoice-save-btn'));
   try {
-    await pyCallStrict('update_invoice_from_data', { id: invoiceId, data });
-    App.toast('Η εγγραφή ενημερώθηκε', 'ok');
+    let savedId;
+    if (isNew) {
+      const res = await pyCallStrict('add_invoice_from_data', { data });
+      savedId = res.id;
+      App.toast('Το τιμολόγιο προστέθηκε', 'ok');
+    } else {
+      savedId = parseInt(invoiceIdVal, 10);
+      await pyCallStrict('update_invoice_from_data', { id: savedId, data });
+      App.toast('Η εγγραφή ενημερώθηκε', 'ok');
+    }
+    if (isNew && pendingNewPdfPath) {
+      try {
+        await pyCallStrict('attach_pdf', { id: savedId, source_path: pendingNewPdfPath });
+      } catch (pdfErr) {
+        App.toast('Το τιμολόγιο αποθηκεύτηκε, αλλά το PDF δεν επισυνάφθηκε: ' + pdfErr.message, 'warn');
+      }
+      pendingNewPdfPath = null;
+    }
     closeEditModal();
     loadBrowse();
     window.reloadLookups();

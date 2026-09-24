@@ -10,7 +10,10 @@
 </div>
 
 <div class="card">
-  <div class="card-title">Περιήγηση</div>
+  <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+    <span>Περιήγηση</span>
+    <button type="button" class="btn btn-primary btn-sm" id="new-invoice-btn">+ Νέο Τιμολόγιο</button>
+  </div>
   <div class="form-row cols-2">
     <div class="field-inline">
       <label for="browse-search" title="προμηθευτής / ΑΦΜ / αρ. παραστ. / μηχάνημα / ημερομηνία / περιγραφή / κατηγορία — χώρισε πολλούς όρους με , ή ; για ΚΑΙ">Αναζήτηση</label>
@@ -62,7 +65,7 @@
 <!-- ── MODAL: ΔΙΟΡΘΩΣΗ ΤΙΜΟΛΟΓΙΟΥ ── -->
 <div class="modal-overlay" id="edit-invoice-modal">
   <div class="modal" style="max-width:1080px;">
-    <div class="modal-title">Διόρθωση Τιμολογίου</div>
+    <div class="modal-title" id="edit-invoice-modal-title">Διόρθωση Τιμολογίου</div>
     <input type="hidden" id="edit-invoice-id">
     <div class="form-row cols-2">
       <div>

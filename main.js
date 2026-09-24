@@ -124,8 +124,7 @@ const RUN_BACKUP_TIMEOUT_MS = 45 * 60 * 1000; // 45 λεπτά
 // αν προστεθεί νέα εντολή εκεί, πρέπει να προστεθεί και εδώ αλλιώς αποτυγχάνει σιωπηλά.
 const ALLOWED_PYTHON_COMMANDS = new Set([
   'get_suppliers', 'add_supplier', 'update_supplier', 'delete_supplier',
-  'get_invoices', 'get_invoice', 'add_invoice', 'update_invoice', 'delete_invoice',
-  'attach_pdf',
+  'get_invoice', 'delete_invoice', 'attach_pdf',
   'import_staging_file', 'get_staging_batch', 'confirm_staging_row', 'reject_staging_row',
   'parse_import_file', 'stage_rows', 'list_categories', 'list_machines',
   'find_duplicate_invoice', 'merge_documents',
@@ -138,7 +137,7 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'dismiss_merge_candidate',
   'list_invoice_items_by_category', 'get_flagged_invoices', 'get_invoice_status_summary',
   'review_flagged_invoice', 'unreview_flagged_invoice',
-  'update_invoice_from_data', 'delete_invoice_item', 'split_invoice_item',
+  'add_invoice_from_data', 'update_invoice_from_data', 'delete_invoice_item', 'split_invoice_item',
   'expvault_export_preview', 'expvault_export_write',
   'get_backup_config', 'run_backup', 'save_backup_config',
   'list_backups', 'restore_backup', 'list_pdf_archives', 'run_pdf_archive_now',

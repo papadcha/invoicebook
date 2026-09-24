@@ -1496,6 +1496,17 @@ def reject_staging_row(staging_id):
         conn.execute("UPDATE tbl_import_staging SET status='rejected' WHERE id=?", (staging_id,))
 
 
+def add_invoice_from_data(data):
+    """Ίδιο raw σχήμα (ονόματα προμηθευτή/μηχανήματος, όχι ids) με
+    update_invoice_from_data, αλλά για δημιουργία ΝΕΟΥ τιμολογίου — έτσι το ίδιο
+    modal του «Περιήγηση» καλύπτει και τη δημιουργία, χωρίς να χρειάζεται
+    ξεχωριστό native create form (βλ. TODO/DONE)."""
+    with get_db() as conn:
+        header = _resolve_header(conn, data)
+        resolved_items = _resolve_items(conn, data.get('items') or [])
+    return add_invoice(header, resolved_items)
+
+
 def update_invoice_from_data(invoice_id, data):
     """Ίδιο raw σχήμα με ένα staging row (ονόματα προμηθευτή/μηχανήματος, όχι
     ids) — το UI της διόρθωσης δεν χρειάζεται δική του λογική resolution.

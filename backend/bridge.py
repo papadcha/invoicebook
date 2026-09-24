@@ -86,18 +86,8 @@ def handle(cmd, payload):
         return {'ok': True}
 
     # ── ΤΙΜΟΛΟΓΙΑ ─────────────────────────────────────────────────────────────
-    if cmd == 'get_invoices':
-        return database.get_invoices(payload.get('date_from'), payload.get('date_to'), payload.get('supplier_id'))
-
     if cmd == 'get_invoice':
         return database.get_invoice(_int_id(payload))
-
-    if cmd == 'add_invoice':
-        return {'id': database.add_invoice(payload['header'], payload.get('items'))}
-
-    if cmd == 'update_invoice':
-        database.update_invoice(_int_id(payload), payload['header'], payload.get('items'))
-        return {'ok': True}
 
     if cmd == 'delete_invoice':
         return {'ok': True, **database.delete_invoice(_int_id(payload))}
@@ -218,6 +208,9 @@ def handle(cmd, payload):
 
     if cmd == 'unreview_flagged_invoice':
         return database.remove_invoice_review(_int_id(payload, 'invoice_id'))
+
+    if cmd == 'add_invoice_from_data':
+        return {'id': database.add_invoice_from_data(payload['data'])}
 
     if cmd == 'update_invoice_from_data':
         return {'id': database.update_invoice_from_data(_int_id(payload), payload['data'])}
