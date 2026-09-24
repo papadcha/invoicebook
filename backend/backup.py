@@ -813,7 +813,14 @@ def restore_backup(path: str) -> dict:
 # μην εξαρτάται κανείς από το να θυμηθεί να τρέξει το script/να τα δει με το χέρι --
 # ανεξάρτητο δίχτυ ασφαλείας αν κάποιο edit έγινε χωρίς το snapshot tool (π.χ. raw cp).
 MANUAL_SNAPSHOT_KEEP = 30       # ίδιο default με το snapshot_before_edit.py's KEEP
-MANUAL_SNAPSHOT_WARN_AT = 20    # οπτική προειδοποίηση πριν φτάσει στο keep-limit
+# Πρέπει να είναι > KEEP, όχι <. Το "Καθάρισε παλιά" κλαδεύει μόνο ΩΣ το KEEP, ποτέ
+# από κάτω -- αν το warn threshold ήταν ≤ KEEP, μετά την πρώτη φορά που φτάνει εκεί
+# η προειδοποίηση θα έμενε ΜΟΝΙΜΗ (το steady-state μετά το καθάρισμα είναι ακριβώς
+# KEEP αρχεία, άρα ποτέ δεν θα έπεφτε ξανά κάτω από το threshold). Πάνω από KEEP
+# σημαίνει ότι όντως συσσωρεύτηκαν παραπάνω απ' ό,τι θα έπρεπε (π.χ. edit χωρίς το
+# snapshot tool) -- ακριβώς η περίπτωση που το καθάρισμα λύνει και η προειδοποίηση
+# πρέπει να εξαφανιστεί μετά.
+MANUAL_SNAPSHOT_WARN_AT = MANUAL_SNAPSHOT_KEEP + 5
 
 
 def _manual_snapshot_dir() -> Path:
