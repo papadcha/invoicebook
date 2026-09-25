@@ -68,7 +68,11 @@ async function navigateTo(pageId) {
   if (!Pages[pageId]) return;
 
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.querySelector(`[data-page="${pageId}"]`)?.classList.add('active');
+  document.querySelectorAll('.nav-dropdown-trigger').forEach(n => n.classList.remove('active-parent'));
+  const activeItem = document.querySelector(`[data-page="${pageId}"]`);
+  activeItem?.classList.add('active');
+  activeItem?.closest('.nav-dropdown')?.querySelector('.nav-dropdown-trigger')?.classList.add('active-parent');
+  document.querySelectorAll('.nav-dropdown.open').forEach(n => n.classList.remove('open'));
   window.AppState.currentPage = pageId;
 
   const container = document.getElementById('page-container');
@@ -91,6 +95,22 @@ async function navigateTo(pageId) {
   document.body.appendChild(script);
 }
 window.navigateTo = navigateTo;
+
+// Dropdown ομάδες στο topnav (π.χ. «Επεξεργασία»/«Διαχείριση») -- click για άνοιγμα/
+// κλείσιμο, ένα ανοιχτό τη φορά, κλείνει και σε κλικ έξω από αυτό. Στατικό DOM (το nav
+// δεν ξαναφτιάχνεται σε κάθε navigateTo), άρα αρκεί μία φορά στην εκκίνηση.
+document.querySelectorAll('.nav-dropdown-trigger').forEach(trigger => {
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
+    const dropdown = trigger.closest('.nav-dropdown');
+    const wasOpen = dropdown.classList.contains('open');
+    document.querySelectorAll('.nav-dropdown.open').forEach(n => n.classList.remove('open'));
+    if (!wasOpen) dropdown.classList.add('open');
+  });
+});
+document.addEventListener('click', () => {
+  document.querySelectorAll('.nav-dropdown.open').forEach(n => n.classList.remove('open'));
+});
 
 // ============================================================
 // TOAST + CONFIRM MODAL
