@@ -1823,6 +1823,9 @@ def _create_bulk_pool(conn, invoice_item_id, item_data):
 
 
 def list_open_bulk_pools():
+    """Κάθε pool κουβαλάει και τη λίστα των ήδη-καταχωρημένων κατανομών του
+    (allocations, ανά μηχάνημα/ημερομηνία) -- πριν αυτό δεν φαινόταν πουθενά στο
+    UI, μόνο το τελικό remaining_quantity (βλ. TODO.md, σχεδιασμός 2026-09-25)."""
     with get_db() as conn:
         rows = conn.execute(
             '''SELECT p.*, it.description, i.doc_date, i.doc_number, s.name as supplier_name
@@ -1833,7 +1836,25 @@ def list_open_bulk_pools():
                WHERE p.closed = 0
                ORDER BY i.doc_date'''
         ).fetchall()
-        return [dict(r) for r in rows]
+        pools = [dict(r) for r in rows]
+        if not pools:
+            return pools
+        pool_ids = [p['id'] for p in pools]
+        placeholders = ','.join('?' * len(pool_ids))
+        alloc_rows = conn.execute(
+            f'''SELECT a.*, m.name as machine_name
+                FROM tbl_allocations a
+                LEFT JOIN tbl_machines m ON m.id = a.machine_id
+                WHERE a.pool_id IN ({placeholders})
+                ORDER BY a.allocation_date, a.id''',
+            pool_ids
+        ).fetchall()
+        by_pool = {}
+        for r in alloc_rows:
+            by_pool.setdefault(r['pool_id'], []).append(dict(r))
+        for p in pools:
+            p['allocations'] = by_pool.get(p['id'], [])
+        return pools
 
 
 def add_allocation(pool_id, machine_name, quantity, allocation_date, notes=None):
@@ -1862,6 +1883,91 @@ def add_allocation(pool_id, machine_name, quantity, allocation_date, notes=None)
             (remaining, now, pool_id)
         )
         return {'remaining_quantity': remaining}
+
+
+def update_allocation(allocation_id, machine_name, quantity, allocation_date, notes=None):
+    """Διόρθωση μιας ήδη-καταχωρημένης κατανομής (π.χ. λάθος ποσότητα/μηχάνημα) --
+    προσαρμόζει το remaining_quantity του pool κατά τη ΔΙΑΦΟΡΑ παλιάς/νέας
+    ποσότητας, όχι απλή επανεγγραφή (αλλιώς θα διπλομετρούσε ή θα έχανε ποσότητα)."""
+    if quantity is None or quantity <= 0:
+        raise ValueError('Η ποσότητα κατανομής πρέπει να είναι θετικός αριθμός')
+    with get_db() as conn:
+        alloc = conn.execute('SELECT * FROM tbl_allocations WHERE id=?', (allocation_id,)).fetchone()
+        if not alloc:
+            raise ValueError('Η κατανομή δεν βρέθηκε')
+        pool = conn.execute('SELECT * FROM tbl_bulk_pools WHERE id=?', (alloc['pool_id'],)).fetchone()
+        delta = quantity - alloc['quantity']
+        if delta > pool['remaining_quantity']:
+            raise ValueError(
+                f'Η νέα ποσότητα ({quantity}) ξεπερνά το διαθέσιμο υπόλοιπο '
+                f'({pool["remaining_quantity"] + alloc["quantity"]})'
+            )
+        machine_id = _find_or_create_machine(conn, machine_name)
+        conn.execute(
+            '''UPDATE tbl_allocations SET machine_id=?, quantity=?, allocation_date=?, notes=?
+               WHERE id=?''',
+            (machine_id, quantity, allocation_date, notes, allocation_id)
+        )
+        remaining = pool['remaining_quantity'] - delta
+        conn.execute(
+            'UPDATE tbl_bulk_pools SET remaining_quantity=?, updated_at=? WHERE id=?',
+            (remaining, _now(), pool['id'])
+        )
+        return {'remaining_quantity': remaining}
+
+
+def delete_allocation(allocation_id):
+    """Διαγραφή μιας κατανομής -- η ποσότητά της επιστρέφει στο remaining_quantity
+    του pool της (ίδιο σκεπτικό με το update_allocation, delta = -quantity)."""
+    with get_db() as conn:
+        alloc = conn.execute('SELECT * FROM tbl_allocations WHERE id=?', (allocation_id,)).fetchone()
+        if not alloc:
+            raise ValueError('Η κατανομή δεν βρέθηκε')
+        pool = conn.execute('SELECT * FROM tbl_bulk_pools WHERE id=?', (alloc['pool_id'],)).fetchone()
+        conn.execute('DELETE FROM tbl_allocations WHERE id=?', (allocation_id,))
+        remaining = pool['remaining_quantity'] + alloc['quantity']
+        conn.execute(
+            'UPDATE tbl_bulk_pools SET remaining_quantity=?, updated_at=? WHERE id=?',
+            (remaining, _now(), pool['id'])
+        )
+        return {'remaining_quantity': remaining}
+
+
+def merge_bulk_pools(keep_id, merge_id):
+    """Ενώνει δύο ανοιχτά pools ΙΔΙΑΣ κατηγορίας/μονάδας -- το σενάριο της
+    δεξαμενής: παλιό υπόλοιπο + νέα παραλαβή. Δεν αθροίζει απλώς τον αριθμό --
+    μεταφέρει τις ΙΔΙΕΣ τις κατανομές (tbl_allocations.pool_id) στο keep_id, ώστε
+    το επιζών pool να κουβαλάει ΟΛΟ το ιστορικό (παλιό+νέο) κάτω από το ίδιο id,
+    όχι μόνο το άθροισμα. Καμία αλλαγή schema -- ίδιο μοτίβο με merge_suppliers/
+    merge_machines (βλ. TODO.md, σχεδιασμός 2026-09-25)."""
+    if keep_id == merge_id:
+        raise ValueError('Δεν μπορεί να συγχωνευτεί απόθεμα με τον εαυτό του')
+    with get_db() as conn:
+        keep = conn.execute('SELECT * FROM tbl_bulk_pools WHERE id=?', (keep_id,)).fetchone()
+        merge = conn.execute('SELECT * FROM tbl_bulk_pools WHERE id=?', (merge_id,)).fetchone()
+        if not keep or not merge:
+            raise ValueError('Το απόθεμα δεν βρέθηκε')
+        if keep['closed'] or merge['closed']:
+            raise ValueError('Δεν μπορεί να συγχωνευτεί κλειστό απόθεμα')
+        if (keep['category'] or '') != (merge['category'] or '') or (keep['unit'] or '') != (merge['unit'] or ''):
+            raise ValueError(
+                f'Διαφορετική κατηγορία/μονάδα — δεν συγχωνεύονται '
+                f'({merge["category"]}/{merge["unit"]} vs {keep["category"]}/{keep["unit"]})'
+            )
+        conn.execute('UPDATE tbl_allocations SET pool_id=? WHERE pool_id=?', (keep_id, merge_id))
+        now = _now()
+        conn.execute(
+            '''UPDATE tbl_bulk_pools SET total_quantity=total_quantity+?, remaining_quantity=remaining_quantity+?,
+               updated_at=? WHERE id=?''',
+            (merge['total_quantity'], merge['remaining_quantity'], now, keep_id)
+        )
+        conn.execute(
+            '''UPDATE tbl_bulk_pools SET closed=1, remaining_quantity=0,
+               close_note=?, updated_at=? WHERE id=?''',
+            (f'Συγχωνεύτηκε στο απόθεμα #{keep_id}', now, merge_id)
+        )
+        updated = conn.execute('SELECT * FROM tbl_bulk_pools WHERE id=?', (keep_id,)).fetchone()
+        return dict(updated)
 
 
 def close_bulk_pool(pool_id, note=None):

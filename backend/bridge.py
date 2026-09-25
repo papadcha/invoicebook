@@ -300,6 +300,18 @@ def handle(cmd, payload):
         database.delete_bulk_pool(_int_id(payload, 'pool_id'))
         return {'ok': True}
 
+    if cmd == 'update_allocation':
+        return database.update_allocation(
+            _int_id(payload, 'allocation_id'), payload.get('machine_name'), payload['quantity'],
+            payload['allocation_date'], payload.get('notes')
+        )
+
+    if cmd == 'delete_allocation':
+        return database.delete_allocation(_int_id(payload, 'allocation_id'))
+
+    if cmd == 'merge_bulk_pools':
+        return database.merge_bulk_pools(_int_id(payload, 'keep_id'), _int_id(payload, 'merge_id'))
+
     # ── ΑΝΑΦΟΡΕΣ ──────────────────────────────────────────────────────────────
     if cmd == 'get_summary':
         return database.get_summary(payload.get('year'), payload.get('month'))

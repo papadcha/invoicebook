@@ -76,6 +76,13 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); min-
 .pool-remaining { font-family: var(--mono); font-size: 14px; }
 .pool-alloc-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px; }
 .pool-alloc-row > div { flex: 1; min-width: 110px; }
+.pool-allocations { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+.pool-alloc-item { display: flex; gap: 10px; align-items: center; padding: 4px 0; font-size: 13px; }
+.pool-alloc-item > span { flex: 0 0 auto; }
+.pool-alloc-machine { flex: 1 1 auto; min-width: 100px; }
+.pool-alloc-notes { flex: 1 1 auto; min-width: 80px; }
+.pool-merge-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.pool-merge-row select { flex: 1; }
 
 /* ── GRID ── */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
