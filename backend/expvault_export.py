@@ -105,18 +105,13 @@ def preview(db, date_from=None, date_to=None):
             if _NON_MATERIAL.search(_norm(desc)):
                 excluded.append({'description': desc, 'reason': 'δεν είναι υλικό'})
                 continue
-            if it['quantity'] is None or it['quantity'] == 0:
+            if it['quantity'] is None or it['quantity'] <= 0:
                 excluded.append({'description': desc, 'reason': 'χωρίς ποσότητα'})
                 continue
             monada = _unit(it['unit'])
             if not monada:
                 warnings.append(f'Άγνωστη μονάδα «{it["unit"] or "—"}» στο «{desc}» — θα μπει ως Κιλ')
-            # Πιστωτικά τιμολόγια/επιστροφές αποθηκεύονται με αρνητική ποσότητα (invoicebook
-            # convention, ίδιο με net_amount/total_amount) -- η κατεύθυνση ΕΙΣΑΓΩΓΗ/ΕΠΙΣΤΡΟΦΗ
-            # δίνεται ήδη από το tipos, όχι από το πρόσημο της ποσότητας. Πριν αυτό, ένα
-            # πιστωτικό αποκλειόταν εντελώς ως "χωρίς ποσότητα" (quantity <= 0), παρόλο που το
-            # ίδιο το σχέδιο (TODO.md) προβλέπει ρητά «Πιστωτικό Τιμολόγιο»→ΕΠΙΣΤΡΟΦΗ.
-            grammes.append({'onoma': desc, 'posotita': abs(it['quantity']), 'monada': monada or 'Κιλ'})
+            grammes.append({'onoma': desc, 'posotita': it['quantity'], 'monada': monada or 'Κιλ'})
         if not m:
             warnings.append('Δεν βρέθηκε «Άδεια: …, Εκδούσα αρχή: …» στις σημειώσεις')
         if not inv['doc_number']:
