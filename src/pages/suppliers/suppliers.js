@@ -22,7 +22,7 @@ async function load() {
   `).join('');
 
   body.querySelectorAll('[data-edit]').forEach(btn => {
-    btn.addEventListener('click', () => fillForm(suppliers.find(s => s.id == btn.dataset.edit)));
+    btn.addEventListener('click', () => openModal(suppliers.find(s => s.id == btn.dataset.edit)));
   });
   body.querySelectorAll('[data-del]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -40,18 +40,24 @@ async function load() {
   });
 }
 
-function fillForm(s) {
-  document.getElementById('sup-id').value = s.id;
-  document.getElementById('sup-name').value = s.name || '';
-  document.getElementById('sup-vat').value = s.vat_number || '';
-  document.getElementById('sup-notes').value = s.notes || '';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+function openModal(s) {
+  document.getElementById('sup-id').value = s ? s.id : '';
+  document.getElementById('sup-name').value = s ? s.name || '' : '';
+  document.getElementById('sup-vat').value = s ? s.vat_number || '' : '';
+  document.getElementById('sup-notes').value = s ? s.notes || '' : '';
+  document.getElementById('supplier-modal-title').textContent = s ? 'Επεξεργασία Προμηθευτή' : 'Νέος Προμηθευτής';
+  document.getElementById('supplier-modal').classList.add('open');
+  document.getElementById('sup-name').focus();
 }
 
-function clearForm() {
-  document.getElementById('sup-id').value = '';
+function closeModal() {
+  document.getElementById('supplier-modal').classList.remove('open');
   document.getElementById('supplier-form').reset();
+  document.getElementById('sup-id').value = '';
 }
+
+document.getElementById('sup-new-btn').addEventListener('click', () => openModal(null));
+document.getElementById('sup-cancel-btn').addEventListener('click', closeModal);
 
 document.getElementById('supplier-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -71,7 +77,7 @@ document.getElementById('supplier-form').addEventListener('submit', async (e) =>
       await pyCallStrict('add_supplier', { name, vat_number, notes });
       App.toast('Ο προμηθευτής προστέθηκε', 'ok');
     }
-    clearForm();
+    closeModal();
     load();
   } catch (err) {
     App.toast(err.message, 'fail');
@@ -79,7 +85,5 @@ document.getElementById('supplier-form').addEventListener('submit', async (e) =>
     unlock();
   }
 });
-
-document.getElementById('sup-clear-btn').addEventListener('click', clearForm);
 
 load();

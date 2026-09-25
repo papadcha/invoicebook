@@ -4,38 +4,43 @@
 </div>
 
 <div class="card">
-  <div class="card-title">Νέος / Επεξεργασία Προμηθευτή</div>
-  <form id="supplier-form">
-    <input type="hidden" id="sup-id">
-    <div class="form-row cols-2">
-      <div>
-        <label for="sup-name">Επωνυμία *</label>
-        <input type="text" id="sup-name" required>
-      </div>
-      <div>
-        <label for="sup-vat">ΑΦΜ</label>
-        <input type="text" id="sup-vat">
-      </div>
-    </div>
-    <div class="form-row">
-      <div>
-        <label for="sup-notes">Σημειώσεις</label>
-        <textarea id="sup-notes"></textarea>
-      </div>
-    </div>
-    <div class="form-actions">
-      <button type="submit" class="btn btn-primary" id="sup-save-btn">Αποθήκευση</button>
-      <button type="button" class="btn btn-outline" id="sup-clear-btn">Καθαρισμός</button>
-    </div>
-  </form>
-</div>
-
-<div class="card">
-  <div class="card-title">Λίστα Προμηθευτών</div>
+  <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+    <span>Λίστα Προμηθευτών</span>
+    <button type="button" class="btn btn-primary btn-sm" id="sup-new-btn">+ Νέος Προμηθευτής</button>
+  </div>
   <div class="table-wrap">
     <table>
       <thead><tr><th>Επωνυμία</th><th>ΑΦΜ</th><th>Σημειώσεις</th><th></th></tr></thead>
       <tbody id="suppliers-body"></tbody>
     </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="supplier-modal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-title" id="supplier-modal-title">Νέος Προμηθευτής</div>
+    <form id="supplier-form">
+      <input type="hidden" id="sup-id">
+      <div class="form-row cols-2">
+        <div>
+          <label for="sup-name">Επωνυμία *</label>
+          <input type="text" id="sup-name" required>
+        </div>
+        <div>
+          <label for="sup-vat">ΑΦΜ</label>
+          <input type="text" id="sup-vat">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label for="sup-notes">Σημειώσεις</label>
+          <textarea id="sup-notes"></textarea>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" id="sup-cancel-btn">Άκυρο</button>
+        <button type="submit" class="btn btn-primary" id="sup-save-btn">Αποθήκευση</button>
+      </div>
+    </form>
   </div>
 </div>
