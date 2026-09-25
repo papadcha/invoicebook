@@ -119,11 +119,19 @@ def add_supplier(name, vat_number=None, notes=None):
 
 
 def update_supplier(supplier_id, name, vat_number=None, notes=None):
+    """Μετονομασία προμηθευτή: αν το όνομα άλλαξε, τα ήδη-συνδεδεμένα PDF όλων των
+    τιμολογίων του ξαναμετονομάζονται (_sync_pdf_filename) ώστε να μη μείνουν με το
+    παλιό, πλέον λάθος όνομα -- ίδιο σκεπτικό με το update_invoice (βλ. εκεί)."""
     with get_db() as conn:
+        old = conn.execute('SELECT name FROM tbl_suppliers WHERE id=?', (supplier_id,)).fetchone()
         conn.execute(
             'UPDATE tbl_suppliers SET name=?, vat_number=?, notes=? WHERE id=?',
             (name, vat_number or None, notes, supplier_id)
         )
+        if old and old['name'] != name:
+            for row in conn.execute(
+                    'SELECT id FROM tbl_invoices WHERE supplier_id=?', (supplier_id,)).fetchall():
+                _sync_pdf_filename(conn, row['id'])
 
 
 def delete_supplier(supplier_id):
@@ -346,16 +354,23 @@ def get_supplier_merge_preview(keep_id, merge_id):
 
 
 def merge_suppliers(keep_id, merge_id):
+    """Τα reassigned τιμολόγια μετονομάζουν το ήδη-συνδεδεμένο PDF τους στο
+    ΝΕΟ (keep_id) όνομα προμηθευτή (_sync_pdf_filename) -- πριν αυτό, ένα bulk
+    merge προμηθευτών άφηνε πίσω δεκάδες PDF με το πλέον-λάθος, παλιό όνομα."""
     if keep_id == merge_id:
         raise ValueError('Δεν μπορεί να συγχωνευτεί προμηθευτής με τον εαυτό του')
     with get_db() as conn:
-        cur = conn.execute(
+        reassigned_ids = [r['id'] for r in conn.execute(
+            'SELECT id FROM tbl_invoices WHERE supplier_id=?', (merge_id,)
+        ).fetchall()]
+        conn.execute(
             'UPDATE tbl_invoices SET supplier_id=? WHERE supplier_id=?',
             (keep_id, merge_id)
         )
-        reassigned = cur.rowcount
+        for invoice_id in reassigned_ids:
+            _sync_pdf_filename(conn, invoice_id)
         conn.execute('DELETE FROM tbl_suppliers WHERE id=?', (merge_id,))
-    return {'reassigned_invoices': reassigned}
+    return {'reassigned_invoices': len(reassigned_ids)}
 
 
 def get_description_merge_candidates():
