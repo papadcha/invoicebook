@@ -294,11 +294,29 @@ document.getElementById('manual-snap-clean-btn').addEventListener('click', async
   }
 });
 
+function renderEnabledState(enabled) {
+  document.getElementById('bk-enabled').checked = enabled !== false;
+  document.getElementById('bk-disabled-note').style.display = enabled === false ? '' : 'none';
+}
+
+document.getElementById('bk-enabled').addEventListener('change', async (e) => {
+  const enabled = e.target.checked;
+  try {
+    await pyCallStrict('set_backup_enabled', { enabled });
+    renderEnabledState(enabled);
+    App.toast(enabled ? 'Backup-on-close ενεργό σε αυτό το μηχάνημα' : 'Backup-on-close απενεργοποιήθηκε σε αυτό το μηχάνημα', 'ok');
+  } catch (err) {
+    e.target.checked = !enabled;
+    App.toast('Σφάλμα: ' + err.message, 'fail');
+  }
+});
+
 async function loadBackupSettings() {
   const cfg = await pyCall('get_backup_config') || { paths: [], max_keep: 20 };
   currentPaths = cfg.paths || [];
   document.getElementById('bk-maxkeep').value = cfg.max_keep ?? 20;
   document.getElementById('bk-maxkeep-label').textContent = cfg.max_keep ?? 20;
+  renderEnabledState(cfg.enabled);
   renderPathsList();
   renderLastStatus(cfg);
   await renderRemotesTable();

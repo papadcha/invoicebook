@@ -12,6 +12,13 @@
     φάκελο, δικτυακό (NAS) φάκελο, ή cloud (rclone) — όσους θέλεις μαζί. Ίδιο αρχείο
     ρυθμίσεων με το intake-tool (δίπλα στη βάση) — αλλαγή εδώ ισχύει και εκεί.
   </p>
+  <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+    <input type="checkbox" id="bk-enabled" style="width:auto; cursor:pointer;">
+    <label for="bk-enabled" style="margin:0; cursor:pointer;">Ενεργό backup-on-close σε αυτό το μηχάνημα</label>
+  </div>
+  <p class="muted-sm" id="bk-disabled-note" style="display:none; margin-bottom:12px;">
+    Απενεργοποιημένο εδώ — οι προορισμοί παρακάτω μένουν αποθηκευμένοι, απλά δεν τρέχει backup στο κλείσιμο σε αυτό το μηχάνημα. Άλλα μηχανήματα με τον ίδιο κώδικα δεν επηρεάζονται.
+  </p>
   <div id="bk-paths-list"></div>
   <button type="button" class="btn btn-outline btn-sm" id="bk-add-path-btn">+ Προορισμός</button>
   <div class="form-row" style="margin-top:16px; max-width:220px;">

@@ -140,7 +140,7 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'review_flagged_invoice', 'unreview_flagged_invoice',
   'add_invoice_from_data', 'update_invoice_from_data', 'delete_invoice_item', 'split_invoice_item',
   'expvault_export_preview', 'expvault_export_write',
-  'get_backup_config', 'run_backup', 'save_backup_config',
+  'get_backup_config', 'run_backup', 'save_backup_config', 'set_backup_enabled',
   'list_backups', 'restore_backup', 'list_pdf_archives', 'run_pdf_archive_now',
   'restore_pdf_store', 'list_rclone_remotes', 'list_remotes_detail', 'delete_remote',
   'list_manual_snapshots', 'prune_manual_snapshots',
@@ -278,7 +278,9 @@ function createWindow() {
       let hasPaths = false;
       try {
         const cfg = await callPython('get_backup_config');
-        hasPaths = Array.isArray(cfg?.paths) && cfg.paths.some(p => p);
+        // enabled !== false -- απουσία του κλειδιού (παλιά config αρχεία, άλλα
+        // μηχανήματα) σημαίνει ενεργό, ίδιο σκεπτικό με το backup.py's set_enabled.
+        hasPaths = Array.isArray(cfg?.paths) && cfg.paths.some(p => p) && cfg?.enabled !== false;
       } catch {}
 
       if (hasPaths) {

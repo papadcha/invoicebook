@@ -252,6 +252,9 @@ def handle(cmd, payload):
     if cmd == 'save_backup_config':
         return backup.save_config(payload.get('paths') or [], payload.get('max_keep', 20))
 
+    if cmd == 'set_backup_enabled':
+        return backup.set_enabled(payload.get('enabled'))
+
     if cmd == 'list_backups':
         return backup.list_backups(payload['folder'])
 

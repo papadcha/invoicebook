@@ -62,7 +62,7 @@ def _load():
         content = p.read_text(encoding='utf-8').strip()
         if content:
             return json.loads(content)
-    return {'paths': [], 'max_keep': 20, 'last_backup': '', 'last_status': ''}
+    return {'paths': [], 'max_keep': 20, 'last_backup': '', 'last_status': '', 'enabled': True}
 
 
 def _save(cfg):
@@ -81,6 +81,17 @@ def _is_rclone(path: str) -> bool:
 
 def get_config():
     return _load()
+
+
+def set_enabled(enabled: bool) -> dict:
+    """On/off διακόπτης backup-on-close ΑΝΕΞΑΡΤΗΤΟΣ από τους προορισμούς -- σε αντίθεση
+    με το άδειασμα του `paths` (μόνος τρόπος πριν), δεν χάνει τη λίστα προορισμών.
+    Απουσία του κλειδιού (παλιά config αρχεία) σημαίνει enabled=True (βλ. main.js's
+    `cfg.enabled !== false`), οπότε αυτό εδώ δεν χρειάζεται migration σε άλλα μηχανήματα."""
+    cfg = _load()
+    cfg['enabled'] = bool(enabled)
+    _save(cfg)
+    return cfg
 
 
 def save_config(paths: list, max_keep: int = 20):
