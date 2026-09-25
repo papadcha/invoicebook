@@ -551,7 +551,12 @@ def update_invoice(invoice_id, header, items=None):
     source_pdf_filename: αν το header ΔΕΝ έχει καθόλου το κλειδί, κρατιέται το
     υπάρχον -- το native invoice form του invoicebook δεν το στέλνει, και πριν
     κάθε αποθήκευση από εκεί μηδένιζε σιωπηλά τη σύνδεση (το αρχείο έμενε ορφανό
-    στο pdf_store). Ρητό None (π.χ. _resolve_header) συνεχίζει να σημαίνει «χωρίς PDF»."""
+    στο pdf_store). Ρητό None (π.χ. _resolve_header) συνεχίζει να σημαίνει «χωρίς PDF».
+
+    Μετά το header update, το ήδη-συνδεδεμένο PDF (αν υπάρχει) μετονομάζεται αυτόματα
+    στο pdf_store ώστε το filename να συνεχίζει να ταιριάζει με προμηθευτή/ημερομηνία/
+    αρ.παραστατικού (βλ. _sync_pdf_filename) -- έτσι μια διόρθωση π.χ. λάθος προμηθευτή
+    δεν αφήνει πίσω ένα PDF με το παλιό, πλέον λάθος όνομα."""
     with get_db() as conn:
         if 'source_pdf_filename' not in header:
             row = conn.execute('SELECT source_pdf_filename FROM tbl_invoices WHERE id=?', (invoice_id,)).fetchone()
@@ -577,6 +582,7 @@ def update_invoice(invoice_id, header, items=None):
              header.get('total_amount'), header.get('payment_method'), header.get('notes'),
              header.get('source_pdf_filename'), _now(), invoice_id)
         )
+        _sync_pdf_filename(conn, invoice_id)
 
         keep_ids = set()
         for it in (items or []):
@@ -757,6 +763,44 @@ def _build_pdf_filename(conn, invoice_id):
     if doc_number:
         base += f' ({_sanitize_filename(str(doc_number))})'
     return base + '.pdf'
+
+
+def _sync_pdf_filename(conn, invoice_id):
+    """Μετά από αλλαγή προμηθευτή/ημερομηνίας/αρ.παραστατικού, το ήδη-συνδεδεμένο
+    PDF στο pdf_store μπορεί να μην ταιριάζει πια με τη σύμβαση του
+    _build_pdf_filename -- το `update_invoice` το τρέχει μετά από ΚΑΘΕ header
+    update ώστε το όνομα αρχείου να μένει σωστό/browsable (βλ. ΓΚΟΥΜΑΣ→ΧΙΟΥΜΑΣ,
+    2026-09-25: η αλλαγή προμηθευτή δεν μετονόμαζε το PDF, χρειάστηκε χειροκίνητη
+    διόρθωση). Ήσυχα δεν κάνει τίποτα αν δεν υπάρχει καταχωρημένο PDF ή το ίδιο
+    το αρχείο λείπει από τον δίσκο -- δεν είναι δουλειά αυτής της συνάρτησης να
+    το ξαναδημιουργήσει, μόνο να το κρατήσει σωστά ονομασμένο."""
+    row = conn.execute(
+        'SELECT source_pdf_filename FROM tbl_invoices WHERE id=?', (invoice_id,)
+    ).fetchone()
+    old_filename = row['source_pdf_filename'] if row else None
+    if not old_filename or not PDF_STORE_DIR:
+        return
+    old_path = os.path.join(PDF_STORE_DIR, old_filename)
+    if not os.path.isfile(old_path):
+        return
+    new_filename = _build_pdf_filename(conn, invoice_id)
+    if new_filename == old_filename:
+        return
+
+    stem, ext = os.path.splitext(new_filename)
+    dest_path = os.path.join(PDF_STORE_DIR, new_filename)
+    counter = 2
+    while os.path.exists(dest_path) or conn.execute(
+            'SELECT 1 FROM tbl_invoices WHERE source_pdf_filename=? AND id<>? LIMIT 1',
+            (os.path.basename(dest_path), invoice_id)).fetchone() is not None:
+        dest_path = os.path.join(PDF_STORE_DIR, f'{stem} ({counter}){ext}')
+        counter += 1
+
+    os.replace(old_path, dest_path)
+    conn.execute(
+        'UPDATE tbl_invoices SET source_pdf_filename=? WHERE id=?',
+        (os.path.basename(dest_path), invoice_id)
+    )
 
 
 def _same_path(a, b):
