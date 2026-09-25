@@ -3,6 +3,24 @@
 Ό,τι έχει ολοκληρωθεί από τη λίστα εργασιών του project Γαλάτιστας. Βλ.
 `TODO.md` για ό,τι μένει. Ίδιο αρχείο και στα 3 repos.
 
+## [invoicebook] On/off διακόπτης backup-on-close ανά μηχάνημα + απενεργοποίηση στο coding PC (2026-09-25)
+
+Αφορμή: κάθε `npm start`/κλείσιμο κατά τις σημερινές δοκιμές UI έτρεχε πραγματικό backup
+(~22δ) στα mega/pcloud dev destinations — άσκοπο για throwaway session testing. Ζητήθηκε
+τρόπος να «παγώσει» μόνο σε αυτό το μηχάνημα, χωρίς να πειραχτεί ο κοινός κώδικας.
+
+Νέο `backup.set_enabled()`/bridge command `set_backup_enabled` — persist ένα `enabled` flag
+στο ίδιο per-machine, gitignored `backup_config.json` (απουσία κλειδιού = enabled, άρα καμία
+migration χρειάζεται σε άλλα μηχανήματα). Το `main.js`'s close handler ελέγχει
+`cfg.enabled !== false` δίπλα στο ήδη υπάρχον hasPaths check. Νέο checkbox στο Ρυθμίσεις
+("Ενεργό backup-on-close σε αυτό το μηχάνημα") — toggle χωρίς να πειράζει τη λίστα
+προορισμών. Δοκιμάστηκε με Playwright: default-on, toggle off/on, persist μετά από αλλαγή
+σελίδας, επιβεβαιώθηκε στο αρχείο στον δίσκο.
+
+**Εφαρμόστηκε στην πράξη σε αυτό το (coding) μηχάνημα**: `enabled: false` στο πραγματικό
+`backend/backup_config.json` — οι 2 προορισμοί (mega/pcloud dev) παραμένουν αποθηκευμένοι,
+απλά δεν τρέχει backup στο κλείσιμο εδώ πια. Ξαναενεργοποίηση: checkbox στο Ρυθμίσεις.
+
 ## [invoicebook] Nav restructure (8→5 top-level) + Προμηθευτές modal (2026-09-25)
 
 Δύο οπτικά fixes την ίδια μέρα, μετά από ζωντανή δοκιμή πάνω στην ψεύτικη βάση:
