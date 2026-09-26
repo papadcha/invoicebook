@@ -1,0 +1,46 @@
+<div class="page-header">
+  <h2>Αναφορές</h2>
+  <p>Συγκεντρωτικά reports πάνω σε όλα τα τιμολόγια/γραμμές, ανεξάρτητα από ό,τι φίλτρο έχει ενεργό η Περιήγηση.</p>
+</div>
+
+<div class="card">
+  <div class="card-title">Μηνιαία Αναφορά</div>
+  <div class="form-row cols-2">
+    <div class="field-inline-group">
+      <div class="field-inline">
+        <label for="reports-date-from">Από</label>
+        <input type="date" id="reports-date-from">
+      </div>
+      <div class="field-inline">
+        <label for="reports-date-to">Έως</label>
+        <input type="date" id="reports-date-to">
+      </div>
+    </div>
+    <div class="field-inline">
+      <label for="reports-category-filter">Κατηγορία</label>
+      <select id="reports-category-filter"><option value="">Όλες</option></select>
+    </div>
+  </div>
+  <div class="form-row cols-3" id="reports-extra-filters">
+    <div class="field-inline">
+      <label for="reports-supplier-filter" title="Ακριβές ταίριασμα προμηθευτή μέσω ΑΦΜ — επίλεξε από τη λίστα, όχι υποσυμβολοσειρά ονόματος">Προμηθευτής (ακριβές)</label>
+      <input type="text" id="reports-supplier-filter" placeholder="Επίλεξε προμηθευτή...">
+    </div>
+    <div class="field-inline">
+      <label for="reports-machine-filter" title="Ακριβές ταίριασμα μηχανήματος (κανονικοποιημένο όνομα) — επίλεξε από τη λίστα">Μηχάνημα (ακριβές)</label>
+      <input type="text" id="reports-machine-filter" placeholder="Επίλεξε μηχάνημα...">
+    </div>
+    <div class="field-inline">
+      <label for="reports-description-filter" title="Ομαδοποίηση κατά τύπο προϊόντος (πρώτα 2 tokens της περιγραφής) — π.χ. «SAE 20W-50» μαζεύει όλες τις μάρκες/προμηθευτές μαζί">Περιγραφή (τύπος προϊόντος)</label>
+      <input type="text" id="reports-description-filter" placeholder="Επίλεξε τύπο προϊόντος...">
+    </div>
+  </div>
+  <p class="muted-sm" id="reports-scope-note" style="margin-bottom:10px;"></p>
+  <div class="stats-grid stats-grid-sm" id="reports-stats"></div>
+  <div class="table-wrap" style="margin-top:14px;">
+    <table id="reports-table">
+      <thead></thead>
+      <tbody id="reports-body"></tbody>
+    </table>
+  </div>
+</div>

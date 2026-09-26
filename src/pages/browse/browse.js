@@ -1,9 +1,7 @@
 import {
-  escapeHtml, fmtDate, fmtQty, fmtMoney, _lock, todayInput,
+  escapeHtml, fmtDate, fmtQty, _lock, todayInput,
   normalizeGreek, normalizeCategory, normalizeMachineCode, attachAutocomplete,
 } from '../../../js/utils.js';
-
-const MONTH_NAMES = ['Ιαν','Φεβ','Μαρ','Απρ','Μάι','Ιούν','Ιούλ','Αύγ','Σεπ','Οκτ','Νοέ','Δεκ'];
 
 // ── ΣΤΑΘΕΡΕΣ ΣΟΒΑΡΟΤΗΤΑΣ ─────────────────────────────────────────────────────
 const SEV_LABEL = { severe: 'Σοβαρό', moderate: 'Μέτριο', duplicate: 'Διπλότυπο', reviewed: 'Επιθεωρήθηκε' };
@@ -110,11 +108,12 @@ let browseSeverityById = {};
 let browseReasonById = {};
 let browseSeverityFilter = '';
 let browseCategoryFilter = '';
+// 'date' = χρονολογικά κατά doc_date (προεπιλογή, ήδη η σειρά που έρχεται από το backend).
+// 'recent' = κατά created_at (πότε μπήκε η εγγραφή στη βάση) — ελεύθερη εναλλαγή, καμία
+// αυτόματη λογική/timer, βλ. συζήτηση 2026-09-26.
+let browseSortMode = 'date';
 const BROWSE_PAGE_SIZE = 200;
 let browsePage = 0;
-// Το πλήρες φιλτραρισμένο σύνολο (πριν το pagination) — reused από τη Μηνιαία
-// Αναφορά, ώστε να συνοψίζει ό,τι βλέπει ήδη ο χρήστης, όχι ξεχωριστό fetch.
-let browseFilteredRows = [];
 
 async function loadBrowse() {
   const category = browseCategoryFilter || null;
@@ -193,7 +192,6 @@ function applyBrowseSearch(rows) {
   if (dateTo) filtered = filtered.filter(r => r.doc_date && r.doc_date <= dateTo);
 
   if (!filtered.length) {
-    browseFilteredRows = [];
     note.textContent = '';
     pagination.innerHTML = '';
     body.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="icon">🔎</div><p>Καμία αντιστοιχία.</p></div></td></tr>`;
@@ -202,10 +200,10 @@ function applyBrowseSearch(rows) {
 
   filtered = filtered.slice().sort((a, b) => {
     const sa = SEV_ACTIVE[browseSeverityById[a.invoice_id]], sb = SEV_ACTIVE[browseSeverityById[b.invoice_id]];
-    if (!!sa === !!sb) return 0;
-    return sa ? -1 : 1;
+    if (!!sa !== !!sb) return sa ? -1 : 1;
+    if (browseSortMode === 'recent') return (b.created_at || '').localeCompare(a.created_at || '');
+    return 0; // ήδη ταξινομημένα κατά doc_date DESC από το backend, σταθερό sort διατηρεί τη σειρά
   });
-  browseFilteredRows = filtered;
 
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / BROWSE_PAGE_SIZE));
@@ -285,95 +283,11 @@ function applyBrowseSearch(rows) {
   }));
 }
 
-// ── ΜΗΝΙΑΙΑ ΑΝΑΦΟΡΑ ──────────────────────────────────────────────────────────
-// Πάνω στα ήδη φιλτραρισμένα rows του Περιήγηση (browseFilteredRows), όχι νέο
-// fetch. Δύο λειτουργίες ανάλογα αν είναι ενεργό φίλτρο κατηγορίας:
-// - Χωρίς κατηγορία: header amounts (net/vat/total) — ένα τιμολόγιο εμφανίζεται
-//   ΠΟΛΛΕΣ φορές (μία ανά γραμμή) στα rows, άρα ΠΡΕΠΕΙ να γίνει dedupe ανά
-//   invoice_id πριν το άθροισμα, αλλιώς πολλαπλασιάζεται το ποσό όσες γραμμές
-//   έχει το τιμολόγιο.
-// - Με κατηγορία: το header amount αφορά ΟΛΟΚΛΗΡΟ το τιμολόγιο, όχι μόνο τις
-//   γραμμές της επιλεγμένης κατηγορίας — δεν έχει νόημα να αθροιστεί. Πηγή
-//   γίνεται η ίδια η γραμμή (quantity/value), χωρίς dedupe.
-function computeMonthlyReport(rows) {
-  const byCategory = !!browseCategoryFilter;
-  const months = new Map();
-
-  const seenInvoicePerMonth = new Set();
-  for (const r of rows) {
-    if (!r.doc_date) continue;
-    const key = r.doc_date.slice(0, 7); // 'YYYY-MM'
-    if (!months.has(key)) {
-      months.set(key, { key, invoiceIds: new Set(), netTotal: 0, vatTotal: 0, grandTotal: 0, qtyTotal: 0, valueTotal: 0 });
-    }
-    const m = months.get(key);
-    m.invoiceIds.add(r.invoice_id);
-
-    if (byCategory) {
-      m.qtyTotal += r.quantity || 0;
-      m.valueTotal += r.value || 0;
-    } else {
-      const dedupeKey = `${key}:${r.invoice_id}`;
-      if (!seenInvoicePerMonth.has(dedupeKey)) {
-        seenInvoicePerMonth.add(dedupeKey);
-        m.netTotal += r.net_amount || 0;
-        m.vatTotal += r.vat_amount || 0;
-        m.grandTotal += r.total_amount || 0;
-      }
-    }
-  }
-
-  const list = Array.from(months.values()).sort((a, b) => b.key.localeCompare(a.key));
-  return { byCategory, months: list };
-}
-
-function renderMonthlyReport() {
-  const { byCategory, months } = computeMonthlyReport(browseFilteredRows);
-  const table = document.getElementById('monthly-report-table');
-  const body = document.getElementById('monthly-report-body');
-  const scopeNote = document.getElementById('monthly-report-scope');
-
-  scopeNote.textContent = byCategory
-    ? `Κατηγορία «${browseCategoryFilter}» — ποσότητα/αξία ανά γραμμή (όχι τα ποσά τιμολογίου, αφορούν ολόκληρο το παραστατικό)`
-    : 'Ποσά τιμολογίου (καθ. αξία/ΦΠΑ/σύνολο), ένα τιμολόγιο μετράει μία φορά';
-
-  table.querySelector('thead').innerHTML = byCategory
-    ? `<tr><th>Μήνας</th><th class="text-right">Τιμολόγια</th><th class="text-right">Ποσότητα</th><th class="text-right">Αξία</th></tr>`
-    : `<tr><th>Μήνας</th><th class="text-right">Τιμολόγια</th><th class="text-right">Καθαρή Αξία</th><th class="text-right">ΦΠΑ</th><th class="text-right">Σύνολο</th></tr>`;
-
-  if (!months.length) {
-    body.innerHTML = `<tr><td colspan="${byCategory ? 4 : 5}"><div class="empty-state"><div class="icon">📄</div><p>Καμία γραμμή στο τρέχον φίλτρο.</p></div></td></tr>`;
-  } else {
-    body.innerHTML = months.map(m => {
-      const [yr, mo] = m.key.split('-');
-      const label = `${MONTH_NAMES[parseInt(mo, 10) - 1]} ${yr}`;
-      return byCategory
-        ? `<tr><td>${label}</td><td class="text-right mono">${m.invoiceIds.size}</td><td class="text-right mono">${fmtQty(m.qtyTotal)}</td><td class="text-right mono">${fmtMoney(m.valueTotal)}</td></tr>`
-        : `<tr><td>${label}</td><td class="text-right mono">${m.invoiceIds.size}</td><td class="text-right mono">${fmtMoney(m.netTotal)}</td><td class="text-right mono">${fmtMoney(m.vatTotal)}</td><td class="text-right mono">${fmtMoney(m.grandTotal)}</td></tr>`;
-    }).join('');
-  }
-
-  const totalInvoices = new Set(months.flatMap(m => Array.from(m.invoiceIds))).size;
-  document.getElementById('monthly-report-stats').innerHTML = byCategory
-    ? `
-      <div class="stat-card"><div class="stat-val">${totalInvoices}</div><div class="stat-label">Τιμολόγια</div></div>
-      <div class="stat-card"><div class="stat-val">${fmtQty(months.reduce((s, m) => s + m.qtyTotal, 0))}</div><div class="stat-label">Ποσότητα (σύνολο)</div></div>
-      <div class="stat-card"><div class="stat-val">${fmtMoney(months.reduce((s, m) => s + m.valueTotal, 0))}</div><div class="stat-label">Αξία (σύνολο)</div></div>
-    `
-    : `
-      <div class="stat-card"><div class="stat-val">${totalInvoices}</div><div class="stat-label">Τιμολόγια</div></div>
-      <div class="stat-card"><div class="stat-val">${fmtMoney(months.reduce((s, m) => s + m.netTotal, 0))}</div><div class="stat-label">Καθαρή Αξία</div></div>
-      <div class="stat-card"><div class="stat-val">${fmtMoney(months.reduce((s, m) => s + m.vatTotal, 0))}</div><div class="stat-label">ΦΠΑ</div></div>
-      <div class="stat-card"><div class="stat-val">${fmtMoney(months.reduce((s, m) => s + m.grandTotal, 0))}</div><div class="stat-label">Σύνολο</div></div>
-    `;
-}
-
-document.getElementById('monthly-report-btn').addEventListener('click', () => {
-  renderMonthlyReport();
-  document.getElementById('monthly-report-modal').classList.add('open');
-});
-document.getElementById('monthly-report-close-btn').addEventListener('click', () => {
-  document.getElementById('monthly-report-modal').classList.remove('open');
+document.getElementById('browse-sort-toggle-btn').addEventListener('click', () => {
+  browseSortMode = browseSortMode === 'date' ? 'recent' : 'date';
+  const btn = document.getElementById('browse-sort-toggle-btn');
+  btn.textContent = browseSortMode === 'recent' ? '🕐 Πρόσφατα' : '📅 Χρονολογικά';
+  applyBrowseSearch(browseRows);
 });
 
 document.getElementById('review-cancel-btn').addEventListener('click', () => {

@@ -1180,7 +1180,7 @@ def get_invoice_items_by_category(category=None, date_from=None, date_to=None):
                       i.id as invoice_id, i.doc_type, i.doc_number, i.doc_date, i.doc_time,
                       i.customer_name, i.customer_vat, i.customer_doy, i.customer_address,
                       i.customer_phone, i.net_amount, i.vat_amount, i.total_amount,
-                      i.payment_method, i.notes, i.source_pdf_filename,
+                      i.payment_method, i.notes, i.source_pdf_filename, i.created_at,
                       s.name as supplier_name, s.vat_number as supplier_vat
                FROM tbl_invoices i
                LEFT JOIN tbl_invoice_items it ON it.invoice_id = i.id
