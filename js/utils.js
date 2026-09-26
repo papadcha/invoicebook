@@ -91,10 +91,18 @@ function _acEnsureDropdown() {
 }
 
 function _acClose() {
+  _acHide();
+  _acInput = null;
+}
+
+// Κρύβει το dropdown ΧΩΡΙΣ να ξεχάσει ποιο input είναι ενεργό — χρήση από το _acSelect,
+// όπου το input ΔΕΝ χάνει ποτέ το focus (το mousedown/preventDefault στο dropdown item
+// το φροντίζει επίτηδες). Αν εδώ γινόταν πλήρες _acClose(), το επόμενο πληκτρολόγημα στο
+// ΙΔΙΟ ήδη-focused πεδίο δεν θα ξανάνοιγε dropdown μέχρι να φύγει/ξαναμπεί το focus.
+function _acHide() {
   if (_acDropdown) _acDropdown.style.display = 'none';
   _acItems = [];
   _acActiveIndex = -1;
-  _acInput = null;
 }
 
 function _acPosition(input) {
@@ -125,7 +133,7 @@ function _acSelect(idx) {
   if (idx < 0 || idx >= _acItems.length || !_acInput) return;
   const input = _acInput;
   input.value = _acItems[idx];
-  _acClose();
+  _acHide();
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.dispatchEvent(new Event('change', { bubbles: true }));
 }
