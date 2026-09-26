@@ -3,6 +3,28 @@
 Ό,τι έχει ολοκληρωθεί από τη λίστα εργασιών του project Γαλάτιστας. Βλ.
 `TODO.md` για ό,τι μένει. Ίδιο αρχείο και στα 3 repos.
 
+## [invoicebook] Αναφορές: κάρτα «⛽ Καύσιμα», πρώτο κομμάτι μεταφερμένο από το report-tool (2026-09-26)
+
+Ο χρήστης αποφάσισε να αρχίσει η πλήρης ενσωμάτωση του `C:\report-tool` στο invoicebook
+(ίδιο μοτίβο με το ήδη ολοκληρωμένο intake-tool→invoicebook) — βλ. CLAUDE.md, νέα
+παράγραφος. Πρώτο κομμάτι: το tab «Καύσιμα» του report-tool (πίνακας γραμμών, ΟΧΙ ακόμα ο
+ΕΦΚ XLSX/PDF generator).
+
+Νέα κάρτα «⛽ Καύσιμα» στο tab «Αναφορές» (`src/pages/reports/`), κάτω από τη Μηνιαία
+Αναφορά, με τα δικά της ανεξάρτητα φίλτρα (αναζήτηση προμηθευτή/αρ. παραστατικού, dropdown
+«Είδος» με ακριβή περιγραφή — ΟΧΙ grouped όπως το φίλτρο Περιγραφή της Μηνιαίας Αναφοράς,
+ίδιο μοτίβο με το πρωτότυπο, εύρος ημερομηνιών) — ίδια συμπεριφορά με το πρωτότυπο fuel tab
+του report-tool, byte-for-byte ίδιο filtering logic. Καμία αλλαγή στο backend: το ήδη
+υπάρχον/whitelisted `list_invoice_items_by_category` κάλυπτε ήδη όλα τα πεδία που
+χρειάζονταν (description/quantity/total_amount/efk_eligible/pdf_available) — απλό
+client-side φιλτράρισμα σε `category==='Καύσιμα'` πάνω στα ήδη φορτωμένα `reportsRows`,
+όχι νέο fetch/νέο cmd. Ο ΕΦΚ report generator (`report-tool/backend/efk_report.py`,
+openpyxl+reportlab) μένει για επόμενο βήμα.
+
+Επιβεβαιώθηκε με Playwright `_electron`: 233 γραμμές καυσίμου φορτώθηκαν σωστά· dropdown
+«Είδος» → «BP Diesel ACTIVE» περιόρισε σε 1 γραμμή· αναζήτηση «ΖΕΙ» σε 135· φίλτρο
+ημερομηνίας «από 2026-01-01» σε 1. Καμία κονσόλα σφάλματος.
+
 ## [invoicebook] Fix: το autocomplete dropdown δεν ξανάνοιγε μετά από επιλογή με κλικ (2026-09-26)
 
 Εντοπίστηκε στο πεδίο Περιγραφή των Αναφορών (βλ. section παρακάτω): πληκτρολόγησε «sae»,
