@@ -396,4 +396,16 @@ document.getElementById('efk-generate-btn').addEventListener('click', async () =
   }
 });
 
+// ── ΥΠΟ-TABS ─────────────────────────────────────────────────────────────────
+// Μηνιαία Αναφορά / ΕΦΚ+Καύσιμα σε ξεχωριστά tabs (2026-09-26) — πριν ήταν στοιβαγμένες
+// κάρτες, χρειαζόταν scroll για να φανεί το ΕΦΚ.
+document.querySelectorAll('.tab-bar .tab-item').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab-bar .tab-item').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+  });
+});
+
 loadReports();

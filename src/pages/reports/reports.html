@@ -3,6 +3,15 @@
   <p>Συγκεντρωτικά reports πάνω σε όλα τα τιμολόγια/γραμμές, ανεξάρτητα από ό,τι φίλτρο έχει ενεργό η Περιήγηση.</p>
 </div>
 
+<!-- Υπο-tabs μέσα στο tab «Αναφορές» — προστέθηκαν 2026-09-26 ώστε η Μηνιαία Αναφορά και το
+     ΕΦΚ/Καύσιμα να μην είναι στοιβαγμένα το ένα κάτω απ' το άλλο (scroll για να φανεί το ΕΦΚ).
+     Ίδιο tab-bar CSS με το πρώην report-tool (`.tab-bar`/`.tab-item`, css/app.css). -->
+<div class="tab-bar">
+  <div class="tab-item active" data-tab="monthly">Μηνιαία Αναφορά</div>
+  <div class="tab-item" data-tab="fuel">⛽ ΕΦΚ / Καύσιμα</div>
+</div>
+
+<div class="tab-panel active" id="tab-monthly">
 <div class="card">
   <div class="card-title">Μηνιαία Αναφορά</div>
   <div class="form-row cols-2">
@@ -44,11 +53,13 @@
     </table>
   </div>
 </div>
+</div>
 
 <!-- Κομμάτια μεταφερμένα από το C:\report-tool (βλ. CLAUDE.md) — ίδιο μοτίβο καρτών με τη
      Μηνιαία Αναφορά παραπάνω, ίδια σειρά/φιλτράρισμα με το πρωτότυπο fuel tab εκεί
      (αναζήτηση/Είδος-dropdown/εύρος ημερομηνιών, ανεξάρτητα από τα φίλτρα της Μηνιαίας
      Αναφοράς). -->
+<div class="tab-panel" id="tab-fuel">
 <div class="card">
   <div class="card-title">Αναφορά ΕΦΚ</div>
   <div class="form-row cols-3">
@@ -118,4 +129,5 @@
       <tbody id="fuel-body"></tbody>
     </table>
   </div>
+</div>
 </div>

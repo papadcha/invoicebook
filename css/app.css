@@ -98,6 +98,19 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); min-
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
 
+/* ── TABS (πρώτη χρήση: υπο-tabs στο tab «Αναφορές», ίδιο CSS με το πρώην report-tool) ── */
+.tab-bar { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 2px solid var(--border); }
+.tab-item {
+  padding: 10px 20px; cursor: pointer; font-size: 13px; font-weight: 600;
+  color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -2px;
+  transition: all 0.15s;
+}
+.tab-item:hover { color: var(--navy2); }
+.tab-item.active { color: var(--navy2); border-bottom-color: var(--accent); }
+.tab-item.disabled { cursor: not-allowed; opacity: 0.4; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
 /* ── FORM ── */
 .form-row { display: grid; gap: 12px; margin-bottom: 12px; }
 .form-row.cols-2 { grid-template-columns: 1fr 1fr; }
