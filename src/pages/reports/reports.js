@@ -1,5 +1,5 @@
 import {
-  escapeHtml, fmtQty, fmtMoney,
+  escapeHtml, fmtDate, fmtQty, fmtMoney,
   normalizeGreek, normalizeMachineCode, attachAutocomplete,
 } from '../../../js/utils.js';
 
@@ -82,6 +82,7 @@ async function loadReports() {
   populateCategoryOptions();
   rebuildDescriptionGroups();
   applyReportsFilters();
+  loadFuelSection();
 }
 
 function applyReportsFilters() {
@@ -262,5 +263,80 @@ document.getElementById('reports-description-filter').addEventListener('input', 
     applyReportsFilters();
   }, 200);
 });
+
+// ── ΚΑΥΣΙΜΑ ───────────────────────────────────────────────────────────────────
+// Πρώτο κομμάτι μεταφερμένο από το C:\report-tool (βλ. CLAUDE.md) — ίδιο φιλτράρισμα
+// με το πρωτότυπο fuel tab εκεί, αλλά χωρίς ξεχωριστό fetch/mode=ro connection: το
+// reportsRows (ήδη φορτωμένο για τη Μηνιαία Αναφορά) ήδη περιέχει ό,τι χρειάζεται
+// (`list_invoice_items_by_category` καλύπτει ήδη category/description/quantity/unit/
+// total_amount/efk_eligible/pdf_available) — απλό client-side φιλτράρισμα σε
+// category==='Καύσιμα', όχι νέο backend command.
+const FUEL_CATEGORY = 'Καύσιμα';
+let fuelRows = [];
+
+function populateFuelDescriptionFilter() {
+  const select = document.getElementById('fuel-description-filter');
+  const current = select.value;
+  const descriptions = [...new Set(fuelRows.map(r => r.description).filter(Boolean))].sort();
+  select.innerHTML = '<option value="">Όλα</option>' +
+    descriptions.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+  if (descriptions.includes(current)) select.value = current;
+}
+
+function renderFuelRows(rows) {
+  const body = document.getElementById('fuel-body');
+  const note = document.getElementById('fuel-result-note');
+  note.textContent = rows.length ? `${rows.length} αποτελέσματα` : '';
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="icon">⛽</div><p>Καμία καταχώρηση.</p></div></td></tr>`;
+    return;
+  }
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td class="mono">${escapeHtml(r.doc_date ? fmtDate(r.doc_date) : '—')}</td>
+      <td>${escapeHtml(r.supplier_name || '—')}</td>
+      <td class="mono">${escapeHtml(r.doc_number || '—')}</td>
+      <td>${escapeHtml(r.description || '—')}</td>
+      <td class="mono text-right">${r.quantity != null ? fmtQty(r.quantity) : '—'}</td>
+      <td class="mono text-right">${fmtMoney(r.total_amount)}</td>
+      <td>${r.efk_eligible ? '✓' : '—'}</td>
+      <td>${r.pdf_available ? `<button class="btn btn-outline btn-sm" data-open-pdf="${escapeHtml(r.source_pdf_filename)}" title="Άνοιγμα PDF">📄</button>` : ''}</td>
+    </tr>
+  `).join('');
+  body.querySelectorAll('[data-open-pdf]').forEach(btn => btn.addEventListener('click', async () => {
+    const res = await window.api.openStoredFile(btn.dataset.openPdf);
+    if (!res.ok) App.toast('Δεν ήταν δυνατό το άνοιγμα: ' + res.error, 'fail');
+  }));
+}
+
+function applyFuelFilter() {
+  const q = normalizeGreek(document.getElementById('fuel-search').value);
+  const description = document.getElementById('fuel-description-filter').value;
+  const from = document.getElementById('fuel-date-from').value;
+  const to = document.getElementById('fuel-date-to').value;
+
+  const filtered = fuelRows.filter(r => {
+    if (q) {
+      const haystack = normalizeGreek(`${r.supplier_name || ''} ${r.doc_number || ''}`);
+      if (!haystack.includes(q)) return false;
+    }
+    if (description && r.description !== description) return false;
+    if (from && (!r.doc_date || r.doc_date < from)) return false;
+    if (to && (!r.doc_date || r.doc_date > to)) return false;
+    return true;
+  });
+  renderFuelRows(filtered);
+}
+
+function loadFuelSection() {
+  fuelRows = reportsRows.filter(r => r.category === FUEL_CATEGORY);
+  populateFuelDescriptionFilter();
+  applyFuelFilter();
+}
+
+document.getElementById('fuel-search').addEventListener('input', applyFuelFilter);
+document.getElementById('fuel-description-filter').addEventListener('change', applyFuelFilter);
+document.getElementById('fuel-date-from').addEventListener('change', applyFuelFilter);
+document.getElementById('fuel-date-to').addEventListener('change', applyFuelFilter);
 
 loadReports();

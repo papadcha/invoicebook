@@ -44,3 +44,39 @@
     </table>
   </div>
 </div>
+
+<!-- Πρώτο κομμάτι που μετακομίζει από το C:\report-tool (βλ. CLAUDE.md) — ίδιο μοτίβο
+     καρτών με τη Μηνιαία Αναφορά παραπάνω, ίδιο φιλτράρισμα με το πρωτότυπο fuel tab
+     εκεί (αναζήτηση/Είδος-dropdown/εύρος ημερομηνιών, ανεξάρτητα από τα φίλτρα της
+     Μηνιαίας Αναφοράς). Το ΕΦΚ report generator (XLSX+PDF) δεν έχει μεταφερθεί ακόμα. -->
+<div class="card">
+  <div class="card-title">⛽ Καύσιμα</div>
+  <div class="form-row cols-4">
+    <div class="field-inline">
+      <label for="fuel-search" title="προμηθευτής / αρ. παραστατικού">Αναζήτηση</label>
+      <input type="text" id="fuel-search" placeholder="π.χ. Ζεϊμπέκης">
+    </div>
+    <div class="field-inline">
+      <label for="fuel-description-filter">Είδος</label>
+      <select id="fuel-description-filter"><option value="">Όλα</option></select>
+    </div>
+    <div class="field-inline">
+      <label for="fuel-date-from">Από</label>
+      <input type="date" id="fuel-date-from">
+    </div>
+    <div class="field-inline">
+      <label for="fuel-date-to">Έως</label>
+      <input type="date" id="fuel-date-to">
+    </div>
+  </div>
+  <div id="fuel-result-note" style="font-size:12px;color:var(--muted);margin-bottom:6px;"></div>
+  <div class="table-wrap">
+    <table id="fuel-table">
+      <thead><tr>
+        <th>Ημ/νία</th><th>Προμηθευτής</th><th>Αρ.Παραστ.</th><th>Περιγραφή</th>
+        <th class="text-right">Λίτρα</th><th class="text-right">Σύνολο</th><th>ΕΦΚ</th><th></th>
+      </tr></thead>
+      <tbody id="fuel-body"></tbody>
+    </table>
+  </div>
+</div>
