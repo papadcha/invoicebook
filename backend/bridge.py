@@ -29,6 +29,7 @@ DB_PATH = os.environ.get('INVOICES_DB_PATH') or os.path.join(_data_dir, 'invoice
 
 import database
 import expvault_export
+import efk_report
 import backup
 database.DB_NAME = DB_PATH
 database.PDF_STORE_DIR = os.path.join(os.path.dirname(DB_PATH), 'pdf_store')
@@ -230,6 +231,13 @@ def handle(cmd, payload):
 
     if cmd == 'split_invoice_item':
         return database.split_invoice_item(_int_id(payload, 'item_id'), payload['splits'])
+
+    # ── ΑΝΑΦΟΡΕΣ: ΕΦΚ Καυσίμων → μεταφέρθηκε από C:\report-tool (2026-09-26) ────
+    if cmd == 'generate_efk_report':
+        return efk_report.generate(
+            database, payload['date_from'], payload['date_to'], payload['rate_per_kiloliter'],
+            payload.get('company') or {}, payload['output_dir'],
+        )
 
     # ── ΕΚΡΗΚΤΙΚΑ → expvault ─────────────────────────────────────────────────
     if cmd == 'expvault_export_preview':

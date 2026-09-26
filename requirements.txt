@@ -2,3 +2,7 @@
 # pypdf προστέθηκε (2026-09-07) για το merge_documents()/_merge_pdfs_and_attach()
 # στο database.py -- ένωση πολυσέλιδων παραστατικών (intake-tool feature).
 pypdf>=6.0
+# openpyxl/reportlab προστέθηκαν (2026-09-26) για το efk_report.py -- παραγωγή της
+# επίσημης Αναλυτικής Κατάστασης ΕΦΚ (XLSX+PDF), μεταφερμένο από το C:\report-tool.
+openpyxl>=3.1
+reportlab>=4.0

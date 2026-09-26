@@ -45,10 +45,49 @@
   </div>
 </div>
 
-<!-- Πρώτο κομμάτι που μετακομίζει από το C:\report-tool (βλ. CLAUDE.md) — ίδιο μοτίβο
-     καρτών με τη Μηνιαία Αναφορά παραπάνω, ίδιο φιλτράρισμα με το πρωτότυπο fuel tab
-     εκεί (αναζήτηση/Είδος-dropdown/εύρος ημερομηνιών, ανεξάρτητα από τα φίλτρα της
-     Μηνιαίας Αναφοράς). Το ΕΦΚ report generator (XLSX+PDF) δεν έχει μεταφερθεί ακόμα. -->
+<!-- Κομμάτια μεταφερμένα από το C:\report-tool (βλ. CLAUDE.md) — ίδιο μοτίβο καρτών με τη
+     Μηνιαία Αναφορά παραπάνω, ίδια σειρά/φιλτράρισμα με το πρωτότυπο fuel tab εκεί
+     (αναζήτηση/Είδος-dropdown/εύρος ημερομηνιών, ανεξάρτητα από τα φίλτρα της Μηνιαίας
+     Αναφοράς). -->
+<div class="card">
+  <div class="card-title">Αναφορά ΕΦΚ</div>
+  <div class="form-row cols-3">
+    <div class="field-inline">
+      <label for="efk-from">Από ημερομηνία</label>
+      <input type="date" id="efk-from">
+    </div>
+    <div class="field-inline">
+      <label for="efk-to">Έως ημερομηνία</label>
+      <input type="date" id="efk-to">
+    </div>
+    <div class="field-inline">
+      <label for="efk-year">Έτος (για τα κουμπιά εξαμήνων)</label>
+      <input type="number" id="efk-year" placeholder="2026" min="2000" max="2100">
+    </div>
+  </div>
+  <div class="form-actions" style="margin-top:0; margin-bottom:16px;">
+    <button type="button" class="btn btn-outline btn-sm" id="efk-h1-btn">Α' Εξάμηνο (01/01–30/06)</button>
+    <button type="button" class="btn btn-outline btn-sm" id="efk-h2-btn">Β' Εξάμηνο (01/07–31/12)</button>
+  </div>
+  <div class="form-row cols-2">
+    <div class="field-inline">
+      <label for="efk-rate">Συντελεστής ΕΦΚ (€ / χιλιόλιτρο)</label>
+      <input type="number" id="efk-rate" step="0.01" placeholder="π.χ. 125">
+    </div>
+    <div class="field-inline">
+      <label>Φάκελος εξόδου</label>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button type="button" class="btn btn-outline" id="efk-pick-output-btn">Επιλογή φακέλου</button>
+        <span id="efk-output-path" class="mono" style="font-size:12px; color:var(--muted); word-break:break-all;">Δεν έχει οριστεί</span>
+      </div>
+    </div>
+  </div>
+  <p class="muted-sm" id="efk-beneficiary-preview" style="margin-bottom:10px;">Ο «Δικαιούχος» (Επωνυμία/ΑΦΜ/ΔΟΥ/Διεύθυνση/Τηλέφωνο) καθορίζεται αυτόματα από τον πελάτη των τιμολογίων της περιόδου — δεν πληκτρολογείται.</p>
+  <div class="form-actions">
+    <button type="button" class="btn btn-primary" id="efk-generate-btn">Δημιουργία Αναφοράς (XLSX + PDF)</button>
+  </div>
+</div>
+
 <div class="card">
   <div class="card-title">⛽ Καύσιμα</div>
   <div class="form-row cols-4">

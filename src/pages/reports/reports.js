@@ -1,5 +1,5 @@
 import {
-  escapeHtml, fmtDate, fmtQty, fmtMoney,
+  escapeHtml, fmtDate, fmtQty, fmtMoney, _lock,
   normalizeGreek, normalizeMachineCode, attachAutocomplete,
 } from '../../../js/utils.js';
 
@@ -338,5 +338,62 @@ document.getElementById('fuel-search').addEventListener('input', applyFuelFilter
 document.getElementById('fuel-description-filter').addEventListener('change', applyFuelFilter);
 document.getElementById('fuel-date-from').addEventListener('change', applyFuelFilter);
 document.getElementById('fuel-date-to').addEventListener('change', applyFuelFilter);
+
+// ── ΑΝΑΦΟΡΑ ΕΦΚ ──────────────────────────────────────────────────────────────
+// Μεταφέρθηκε από το C:\report-tool — μόνο η θέση αποθήκευσης της τελευταίας επιλογής
+// φακέλου άλλαξε (localStorage εδώ, ήταν δικό του settings.json εκεί μέσω get_settings/
+// save_settings — απλή wrapper λειτουργικότητα χωρίς άλλη χρήση, δεν άξιζε να μεταφερθεί
+// σαν γενικό backend cmd για μία και μόνο τιμή).
+const EFK_OUTPUT_DIR_KEY = 'invoicebook_efk_output_dir';
+
+document.getElementById('efk-h1-btn').addEventListener('click', () => {
+  const y = document.getElementById('efk-year').value || new Date().getFullYear();
+  document.getElementById('efk-from').value = `${y}-01-01`;
+  document.getElementById('efk-to').value = `${y}-06-30`;
+});
+document.getElementById('efk-h2-btn').addEventListener('click', () => {
+  const y = document.getElementById('efk-year').value || new Date().getFullYear();
+  document.getElementById('efk-from').value = `${y}-07-01`;
+  document.getElementById('efk-to').value = `${y}-12-31`;
+});
+
+(function initEfkOutputDir() {
+  let saved = null;
+  try { saved = localStorage.getItem(EFK_OUTPUT_DIR_KEY); } catch { /* private mode κ.λπ. */ }
+  if (saved) document.getElementById('efk-output-path').textContent = saved;
+})();
+
+document.getElementById('efk-pick-output-btn').addEventListener('click', async () => {
+  const dir = await window.api.openDir();
+  if (!dir) return;
+  document.getElementById('efk-output-path').textContent = dir;
+  try { localStorage.setItem(EFK_OUTPUT_DIR_KEY, dir); } catch { /* private mode κ.λπ. */ }
+});
+
+document.getElementById('efk-generate-btn').addEventListener('click', async () => {
+  const date_from = document.getElementById('efk-from').value;
+  const date_to = document.getElementById('efk-to').value;
+  const rate_per_kiloliter = document.getElementById('efk-rate').value;
+  const output_dir = document.getElementById('efk-output-path').textContent;
+
+  if (!date_from || !date_to) { App.toast('Όρισε περίοδο (από/έως)', 'fail'); return; }
+  if (!rate_per_kiloliter) { App.toast('Όρισε συντελεστή ΕΦΚ', 'fail'); return; }
+  if (!output_dir || output_dir === 'Δεν έχει οριστεί') { App.toast('Επίλεξε φάκελο εξόδου', 'fail'); return; }
+
+  const unlock = _lock(document.getElementById('efk-generate-btn'));
+  try {
+    const r = await pyCallStrict('generate_efk_report', {
+      date_from, date_to, rate_per_kiloliter, output_dir, company: {},
+    });
+    document.getElementById('efk-beneficiary-preview').textContent =
+      `${r.beneficiary_name} — ΑΦΜ ${r.beneficiary_vat}, ΔΟΥ ${r.beneficiary_doy || '—'}, ` +
+      `${r.beneficiary_address || '—'}, τηλ. ${r.beneficiary_phone || '—'}`;
+    App.toast(`Αναφορά έτοιμη — ${r.row_count} τιμολόγια, ${fmtQty(r.total_liters)} λίτρα, επιστροφή ${fmtMoney(r.refund_amount)}`, 'ok');
+  } catch (e) {
+    App.toast(e.message, 'fail');
+  } finally {
+    unlock();
+  }
+});
 
 loadReports();
