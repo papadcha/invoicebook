@@ -315,10 +315,6 @@ def handle(cmd, payload):
     if cmd == 'merge_bulk_pools':
         return database.merge_bulk_pools(_int_id(payload, 'keep_id'), _int_id(payload, 'merge_id'))
 
-    # ── ΑΝΑΦΟΡΕΣ ──────────────────────────────────────────────────────────────
-    if cmd == 'get_summary':
-        return database.get_summary(payload.get('year'), payload.get('month'))
-
     raise ValueError(f'Άγνωστη εντολή: {cmd}')
 
 

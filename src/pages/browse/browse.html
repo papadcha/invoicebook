@@ -12,7 +12,10 @@
 <div class="card">
   <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
     <span>Περιήγηση</span>
-    <button type="button" class="btn btn-primary btn-sm" id="new-invoice-btn">+ Νέο Τιμολόγιο</button>
+    <div style="display:flex; gap:8px;">
+      <button type="button" class="btn btn-outline btn-sm" id="monthly-report-btn">📊 Μηνιαία Αναφορά</button>
+      <button type="button" class="btn btn-primary btn-sm" id="new-invoice-btn">+ Νέο Τιμολόγιο</button>
+    </div>
   </div>
   <div class="form-row cols-2">
     <div class="field-inline">
@@ -41,6 +44,24 @@
     </table>
   </div>
   <div id="browse-pagination" style="display:flex;align-items:center;gap:10px;margin-top:10px;"></div>
+</div>
+
+<!-- ── MODAL: ΜΗΝΙΑΙΑ ΑΝΑΦΟΡΑ ── -->
+<div class="modal-overlay" id="monthly-report-modal">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-title">Μηνιαία Αναφορά</div>
+    <p class="muted-sm" id="monthly-report-scope" style="margin-bottom:10px;"></p>
+    <div class="stats-grid stats-grid-sm" id="monthly-report-stats"></div>
+    <div class="table-wrap" style="margin-top:14px;">
+      <table id="monthly-report-table">
+        <thead></thead>
+        <tbody id="monthly-report-body"></tbody>
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="monthly-report-close-btn">Κλείσιμο</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── MODAL: ΕΠΙΘΕΩΡΗΣΗ ΤΙΜΟΛΟΓΙΟΥ ── -->
