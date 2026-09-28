@@ -271,13 +271,20 @@ async function loadStaging() {
       // διπλοκαταχωρήσεις που ο παραπάνω έλεγχος χάνει όταν ο αριθμός/η ημερομηνία
       // διαβάστηκαν διαφορετικά (π.χ. «236» / «Κ2 236», 2026-09-23).
       const samePdf = await pyCallStrict('find_invoices_with_same_pdf', { paths: row.data.source_pdf_path });
-      if (samePdf.length) {
-        const invoices = [...new Map(samePdf.map(i => [i.id, i])).values()]
+      if (samePdf.matches.length) {
+        const invoices = [...new Map(samePdf.matches.map(i => [i.id, i])).values()]
           .map(i => `#${i.id} (${i.doc_number || '—'}, ${i.doc_date}, ${i.supplier_name || '—'})`).join(', ');
         const proceed = await App.confirmAsync(
           `Το PDF αυτής της γραμμής είναι ΙΔΙΟ ακριβώς αρχείο με το PDF του ήδη καταχωρημένου ` +
           `τιμολογίου ${invoices} — πιθανή διπλοκαταχώρηση (ο αριθμός ή η ημερομηνία ίσως ` +
           `διαβάστηκαν διαφορετικά). Καταχώρηση παρ' όλα αυτά;`
+        );
+        if (!proceed) { unlock(); return; }
+      } else if (samePdf.unverified_paths.length) {
+        const proceed = await App.confirmAsync(
+          `Δεν ήταν δυνατός ο έλεγχος διπλοκαταχώρησης για αυτή τη γραμμή — το πηγαίο αρχείο δεν ` +
+          `βρέθηκε πια εκεί που το περίμενε το staging (${samePdf.unverified_paths.join(', ')}). ` +
+          `Ελέγξτε χειροκίνητα ότι δεν είναι ήδη καταχωρημένο πριν συνεχίσετε. Καταχώρηση παρ' όλα αυτά;`
         );
         if (!proceed) { unlock(); return; }
       }

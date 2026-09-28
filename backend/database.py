@@ -1139,27 +1139,37 @@ def delete_orphan_pdfs(filenames):
 def find_invoices_with_same_pdf(paths):
     """Layer 1 έλεγχος πριν την καταχώρηση: τιμολόγια των οποίων το PDF είναι ΙΔΙΟ
     ακριβώς αρχείο με κάποιο από τα paths (source_pdf_path ενός staging row --
-    string ή λίστα σελίδων)."""
+    string ή λίστα σελίδων).
+
+    Επιστρέφει {'matches': [...], 'unverified_paths': [...]} -- πριν 2026-09-28
+    επέστρεφε γυμνή λίστα matches και αγνοούσε ΣΙΩΠΗΛΑ paths που δεν υπήρχαν πια
+    στον δίσκο (π.χ. το staging row έδειχνε σε ήδη καθαρισμένο/μετακινημένο
+    ενδιάμεσο αρχείο) -- αυτό επέτρεψε 3 πραγματικά διπλότυπα τιμολόγια να
+    καταχωρηθούν χωρίς ΚΑΜΙΑ προειδοποίηση στο UI, ενώ το ίδιο batch σωστά
+    προειδοποίησε για τα υπόλοιπα 4 του οποίου το αρχείο υπήρχε ακόμα. Το
+    caller (import.js) πρέπει τώρα να προειδοποιεί ξεχωριστά όταν κάτι δεν
+    μπόρεσε καν να ελεγχθεί, αντί να το προσπερνάει σαν "κανένα διπλότυπο"."""
     if isinstance(paths, str):
         paths = [paths]
-    paths = [p for p in (paths or []) if p and os.path.isfile(p)]
-    if not paths:
-        return []
-    files = _store_pdf_files()
+    all_paths = [p for p in (paths or []) if p]
+    existing = [p for p in all_paths if os.path.isfile(p)]
+    unverified = [p for p in all_paths if p not in existing]
     matches = []
-    with get_db() as conn:
-        refs = _invoice_pdf_refs(conn)
-        for p in paths:
-            size = os.path.getsize(p)
-            candidates = [n for n in refs if n in files and files[n][0] == size]
-            if not candidates:
-                continue
-            sha = _sha256_file(p)
-            hashes = _cached_hashes(conn, files, candidates)
-            for name in candidates:
-                if hashes[name] == sha:
-                    matches.extend(dict(inv, matched_path=p) for inv in refs[name])
-    return matches
+    if existing:
+        files = _store_pdf_files()
+        with get_db() as conn:
+            refs = _invoice_pdf_refs(conn)
+            for p in existing:
+                size = os.path.getsize(p)
+                candidates = [n for n in refs if n in files and files[n][0] == size]
+                if not candidates:
+                    continue
+                sha = _sha256_file(p)
+                hashes = _cached_hashes(conn, files, candidates)
+                for name in candidates:
+                    if hashes[name] == sha:
+                        matches.extend(dict(inv, matched_path=p) for inv in refs[name])
+    return {'matches': matches, 'unverified_paths': unverified}
 
 
 def get_invoice_items_by_category(category=None, date_from=None, date_to=None):
