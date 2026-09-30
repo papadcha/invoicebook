@@ -1622,14 +1622,15 @@ def confirm_staging_row(staging_id):
 
         conn.execute("UPDATE tbl_import_staging SET status='confirmed' WHERE id=?", (staging_id,))
 
+    pdf_attach_error = None
     source_pdf_path = data.get('source_pdf_path')
     if source_pdf_path:
         # source_pdf_path: string (1 σελίδα, ιστορικό σχήμα) ή λίστα από strings σε
         # σειρά σελίδων (πολλές φωτογραφίες/σαρώσεις του ίδιου παραστατικού
         # συνδυάστηκαν σε ένα AI call, βλ. TODO.md) -- και στις δύο περιπτώσεις πρέπει
         # να καταλήξει ΕΝΑ attached PDF στο pdf_store.
-        paths = source_pdf_path if isinstance(source_pdf_path, list) else [source_pdf_path]
-        paths = [p for p in paths if p and os.path.exists(p)]
+        paths_given = source_pdf_path if isinstance(source_pdf_path, list) else [source_pdf_path]
+        paths = [p for p in paths_given if p and os.path.exists(p)]
         try:
             if len(paths) == 1:
                 attach_pdf(invoice_id, paths[0])
@@ -1637,11 +1638,22 @@ def confirm_staging_row(staging_id):
                 # Ίδια μηχανή με το "Εργαλείο ένωσης πολυσέλιδων παραστατικών" -- συγχωνεύει
                 # τα N PDF σε ένα πολυσέλιδο πριν το attach, καμία ξεχωριστή λογική εδώ.
                 _merge_pdfs_and_attach(invoice_id, paths)
+            elif paths_given:
+                # Κανένα από τα δοσμένα paths δεν βρέθηκε στο δίσκο (π.χ. μετακινήθηκε/
+                # διαγράφηκε στο μεταξύ) -- πριν περνούσε εντελώς απαρατήρητο.
+                raise FileNotFoundError('δεν βρέθηκε(αν) στο δίσκο: ' + ', '.join(paths_given))
         except Exception as e:
+            # Σκόπιμα ΔΕΝ κάνει raise -- το τιμολόγιο έχει ήδη καταχωρηθεί σωστά (commit
+            # παραπάνω) και δεν πρέπει να χαθεί επειδή απέτυχε μόνο η επισύναψη PDF. Το
+            # σφάλμα γυρνάει στον caller (βλ. pdf_attach_error) ώστε το UI να το δείξει
+            # αντί να χάνεται σιωπηλά σε αυτό το print -- βλ. TODO/DONE 2026-09-30: ένα
+            # κλειδωμένο πηγαίο PDF άφησε 10+ τιμολόγια χωρίς PDF, ο χειριστής το έμαθε
+            # μόνο τυχαία, ώρες μετά.
             print(f'confirm_staging_row: αποτυχία αυτόματης επισύναψης PDF για invoice '
-                  f'{invoice_id} ({paths}): {e}', file=sys.stderr)
+                  f'{invoice_id} ({paths_given}): {e}', file=sys.stderr)
+            pdf_attach_error = str(e)
 
-    return invoice_id
+    return {'invoice_id': invoice_id, 'pdf_attach_error': pdf_attach_error}
 
 
 def reject_staging_row(staging_id):

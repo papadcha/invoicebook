@@ -314,8 +314,17 @@ async function loadStaging() {
       // Το confirm_staging_row επισυνάπτει ήδη το PDF (source_pdf_path) στο backend --
       // ένα δεύτερο attach_pdf εδώ έβρισκε το αρχείο ήδη μετακινημένο και έβγαζε ψευδές
       // «δεν επισυνάφθηκε».
-      await pyCallStrict('confirm_staging_row', { id: stagingId });
-      App.toast('Καταχωρήθηκε ως τιμολόγιο', 'ok');
+      const { invoice_id, pdf_attach_error } = await pyCallStrict('confirm_staging_row', { id: stagingId });
+      if (pdf_attach_error) {
+        // Το τιμολόγιο καταχωρήθηκε κανονικά -- μόνο η επισύναψη PDF απέτυχε (π.χ. το
+        // πηγαίο αρχείο ήταν κλειδωμένο από άλλο πρόγραμμα τη στιγμή του confirm). Πριν
+        // αυτό χανόταν σιωπηλά σε ένα stderr print που κανείς δεν έβλεπε (βλ. TODO/DONE
+        // 2026-09-30) -- τώρα ο χειριστής ξέρει αμέσως ότι πρέπει να κάνει χειροκίνητο
+        // «Επισύναψη» στο τιμολόγιο #invoice_id.
+        App.toast(`Καταχωρήθηκε ως τιμολόγιο #${invoice_id}, αλλά ΔΕΝ επισυνάφθηκε το PDF (${pdf_attach_error}) — χρειάζεται χειροκίνητη επισύναψη`, 'warn');
+      } else {
+        App.toast('Καταχωρήθηκε ως τιμολόγιο', 'ok');
+      }
       window.reloadLookups();
       loadStaging();
     } catch (e) {

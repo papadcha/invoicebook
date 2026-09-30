@@ -119,7 +119,7 @@ def handle(cmd, payload):
         return database.update_staging_row(_int_id(payload), payload['patch'])
 
     if cmd == 'confirm_staging_row':
-        return {'invoice_id': database.confirm_staging_row(_int_id(payload))}
+        return database.confirm_staging_row(_int_id(payload))
 
     if cmd == 'reject_staging_row':
         database.reject_staging_row(_int_id(payload))
