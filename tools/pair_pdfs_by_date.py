@@ -46,6 +46,19 @@ import unicodedata
 
 
 FNAME_RE = re.compile(r'^(\d{2})-(\d{2})-(\d{2})[\s\-]+(.+)$')
+_CITE_RE = re.compile(r'\[cite:\s*[0-9,\s]+\]')
+
+
+def load_gemini_json(path):
+    """Καθαρίζει γνωστές παραξενιές στην ωμή απάντηση του Gemini πριν το json.load —
+    ίδια συνάρτηση με pair_pdfs_by_order.py/pair_pdfs_with_json.py, βλ. εκεί για το
+    γιατί (inline "[cite: N]" citation markers, markdown code fence, trailing
+    κείμενο μετά το JSON)."""
+    with open(path, 'r', encoding='utf-8') as f:
+        text = f.read()
+    text = _CITE_RE.sub('', text).strip()
+    text = re.sub(r'^```[a-zA-Z]*\s*', '', text)
+    return json.JSONDecoder().raw_decode(text)[0]
 
 
 def tokens(s):
@@ -80,8 +93,7 @@ def main():
     if not pdfs:
         sys.exit(f'Δεν βρέθηκαν PDF μέσα στο: {folder}')
 
-    with open(args.gemini_json, 'r', encoding='utf-8') as f:
-        rows = json.load(f)
+    rows = load_gemini_json(args.gemini_json)
     if not isinstance(rows, list):
         rows = [rows]
 

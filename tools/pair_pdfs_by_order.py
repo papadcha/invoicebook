@@ -30,7 +30,25 @@ JSON, το script ρωτάει πόσες σελίδες έχει κάθε τι�
 import argparse
 import json
 import os
+import re
 import sys
+
+_CITE_RE = re.compile(r'\[cite:\s*[0-9,\s]+\]')
+
+
+def load_gemini_json(path):
+    """Καθαρίζει γνωστές παραξενιές στην ωμή απάντηση του Gemini πριν το json.load:
+    inline citation markers όπως "[cite: 4]" που μπερδεύονται ΜΕΣΑ σε πεδία (ΑΦΜ,
+    αριθμό παραστατικού κ.λπ.) όταν το Gemini χρησιμοποιεί grounding/citations, το
+    markdown code fence (```json ... ```) γύρω από το array, και τυχόν trailing
+    κείμενο μετά το JSON (π.χ. ξεχασμένο κλείσιμο ``` σε αρχείο που αποθηκεύτηκε
+    αυτούσιο) -- πριν αυτό έσκαγε με "Extra data" ή περνούσε λάθος ΑΦΜ/αριθμούς
+    παραστατικού γεμάτους "[cite: N]" (βλ. TODO/DONE 2026-09-30)."""
+    with open(path, 'r', encoding='utf-8') as f:
+        text = f.read()
+    text = _CITE_RE.sub('', text).strip()
+    text = re.sub(r'^```[a-zA-Z]*\s*', '', text)
+    return json.JSONDecoder().raw_decode(text)[0]
 
 
 def main():
@@ -51,8 +69,7 @@ def main():
     if not pdfs:
         sys.exit(f'Δεν βρέθηκαν PDF μέσα στο: {folder}')
 
-    with open(args.gemini_json, 'r', encoding='utf-8') as f:
-        rows = json.load(f)
+    rows = load_gemini_json(args.gemini_json)
     if not isinstance(rows, list):
         rows = [rows]
 

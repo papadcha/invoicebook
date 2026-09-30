@@ -7,6 +7,7 @@ import sys
 import io
 import json
 import os
+import re
 import csv
 import traceback
 
@@ -49,12 +50,29 @@ def _int_id(payload, key='id'):
     return val
 
 
+_CITE_RE = re.compile(r'\[cite:\s*[0-9,\s]+\]')
+
+
+def _load_ai_json_text(text):
+    """Καθαρίζει γνωστές παραξενιές σε ωμό JSON που έρχεται από AI chat (Gemini κ.ά.)
+    πριν το json.load -- βλ. TODO/DONE 2026-09-30, batch NITROCHEM/ΛΑΤΟΜΕΙΑ ΓΑΛΑΤΙΣΤΑΣ:
+    (1) inline citation markers όπως "[cite: 4]" που το Gemini μπερδεύει ΜΕΣΑ σε
+    πεδία (ΑΦΜ, αριθμό παραστατικού κ.λπ.), χαλώντας τα δεδομένα σιωπηλά αν δεν
+    αφαιρεθούν· (2) markdown code fence (```json ... ```) και οτιδήποτε άλλο κείμενο
+    πριν/μετά το JSON (π.χ. ένα ξεχασμένο κλείσιμο ``` σε αρχείο που αποθηκεύτηκε
+    αυτούσιο από το Gemini) -- το raw_decode διαβάζει μόνο το πρώτο έγκυρο JSON value
+    και αγνοεί ό,τι ακολουθεί, αντί να σκάει με "Extra data"."""
+    text = _CITE_RE.sub('', text).strip()
+    text = re.sub(r'^```[a-zA-Z]*\s*', '', text)
+    return json.JSONDecoder().raw_decode(text)[0]
+
+
 def _parse_import_file(file_path):
     """Επιστρέφει λίστα από dict (ένα ανά τιμολόγιο), με προαιρετικό 'items'."""
     ext = os.path.splitext(file_path)[1].lower()
     if ext == '.json':
         with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+            data = _load_ai_json_text(f.read())
         if isinstance(data, dict):
             data = data.get('invoices', [])
         return data

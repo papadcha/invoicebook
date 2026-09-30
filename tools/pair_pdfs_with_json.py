@@ -43,7 +43,22 @@ PDF χωρίς JSON), το script ΔΕΝ μαντεύει — αναφέρει �
 import argparse
 import json
 import os
+import re
 import sys
+
+_CITE_RE = re.compile(r'\[cite:\s*[0-9,\s]+\]')
+
+
+def load_gemini_json(path):
+    """Καθαρίζει γνωστές παραξενιές στην ωμή απάντηση του Gemini πριν το json.load —
+    ίδια συνάρτηση με pair_pdfs_by_order.py/pair_pdfs_by_date.py, βλ. εκεί για το
+    γιατί (inline "[cite: N]" citation markers, markdown code fence, trailing
+    κείμενο μετά το JSON)."""
+    with open(path, 'r', encoding='utf-8') as f:
+        text = f.read()
+    text = _CITE_RE.sub('', text).strip()
+    text = re.sub(r'^```[a-zA-Z]*\s*', '', text)
+    return json.JSONDecoder().raw_decode(text)[0]
 
 
 def _pair_by_subfolder(folder, subdirs, out_name):
@@ -61,8 +76,7 @@ def _pair_by_subfolder(folder, subdirs, out_name):
             problems.append(f'"{d}": πρέπει να περιέχει ΑΚΡΙΒΩΣ ένα .json (βρέθηκαν {len(sub_jsons)})')
             continue
         json_path = os.path.join(dpath, sub_jsons[0])
-        with open(json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        data = load_gemini_json(json_path)
         rows = data if isinstance(data, list) else [data]
         paths = [os.path.join(dpath, name) for name in sub_pdfs]
         for row in rows:
@@ -134,8 +148,7 @@ def main():
     for name in sorted(pdfs):
         pdf_path = os.path.join(folder, pdfs[name])
         json_path = os.path.join(folder, jsons[name])
-        with open(json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        data = load_gemini_json(json_path)
         rows = data if isinstance(data, list) else [data]
         for row in rows:
             row['source_pdf_path'] = pdf_path
