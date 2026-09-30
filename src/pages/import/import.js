@@ -439,10 +439,23 @@ function updateMergeSumStatus() {
 }
 
 function recalcMergeHeaderFromItems() {
-  const rows = Array.from(document.querySelectorAll('#merge-items-body tr[data-item-row]'));
+  const rows = Array.from(document.querySelectorAll('#merge-items-body tr[data-item-row]'))
+    .filter(tr => tr.querySelector('[data-f="selected"]').checked);
+  // Δελτία αποστολής χωρίς τιμές (π.χ. εκρηκτικά) δεν έχουν ΚΑΝΕΝΑ value στις γραμμές
+  // τους — πριν αυτό υπολόγιζε net/vat/total = 0.00 και τα έγραφε ρητά στα πεδία,
+  // αντί να τα αφήσει κενά· ένα 0.00 (αντί για NULL) στο net_amount ενεργοποιούσε
+  // αργότερα σιωπηλά τη σημαία "Μέτριο" στο tab Κατάσταση (get_flagged_invoices:
+  // "Γραμμή με ποσότητα χωρίς τιμή"), βλ. τιμολόγιο 3096, 2026-09-30 — ενώ η ίδια
+  // κατάσταση χωρίς merge (net_amount μένει NULL) δεν σημαίνεται καθόλου.
+  const anyValue = rows.some(tr => tr.querySelector('[data-f="value"]').value !== '');
+  if (!anyValue) {
+    document.getElementById('merge-net-amount').value = '';
+    document.getElementById('merge-vat-amount').value = '';
+    document.getElementById('merge-total-amount').value = '';
+    return;
+  }
   let net = 0, vat = 0;
   rows.forEach(tr => {
-    if (!tr.querySelector('[data-f="selected"]').checked) return;
     const value = parseFloat(tr.querySelector('[data-f="value"]').value) || 0;
     const vatPct = parseFloat(tr.querySelector('[data-f="vat_pct"]').value) || 0;
     net += value;

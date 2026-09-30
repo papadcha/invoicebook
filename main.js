@@ -119,6 +119,14 @@ function callPython(cmd, payload = {}, timeoutMs = 120000) {
 // Το backup μπορεί να αργήσει πολύ περισσότερο από το τυπικό 120s όριο σε αργό
 // cloud remote (βλ. backend/backup.py) — ίδιο μοτίβο με το intake-tool.
 const RUN_BACKUP_TIMEOUT_MS = 45 * 60 * 1000; // 45 λεπτά
+// Το ίδιο ισχύει και για το χειροκίνητο "Δημιουργία Τώρα" του PDF archive:
+// backup.py's _do_pdf_archive κάνει rclone copyto με ΔΙΚΟ ΤΟΥ timeout 1800s (30')
+// ΑΝΑ προορισμό (π.χ. Z: + pcloud: + mega: = ως 90' συνολικά για ένα ~1.5GB+ zip) —
+// χωρίς αυτό, το προεπιλεγμένο 120s όριο του callPython εδώ έκανε timeout πολύ πριν
+// τελειώσει το backend, δείχνοντας ψευδές "κόλλημα" ενώ το bridge.py συνέχιζε σιωπηλά
+// να δουλεύει στο παρασκήνιο και μπλόκαρε κάθε επόμενη εντολή (ακόμα και το κλείσιμο
+// του app) μέχρι να τελειώσει -- βλ. TODO/DONE 2026-09-30.
+const RUN_PDF_ARCHIVE_TIMEOUT_MS = RUN_BACKUP_TIMEOUT_MS;
 
 // Πρέπει να μείνει συγχρονισμένο με τη λίστα `if cmd == '...'` του backend/bridge.py —
 // αν προστεθεί νέα εντολή εκεί, πρέπει να προστεθεί και εδώ αλλιώς αποτυγχάνει σιωπηλά.
@@ -155,7 +163,9 @@ function setupIPC() {
       return { ok: false, error: `Άγνωστη εντολή: ${cmd}` };
     }
     try {
-      const timeoutMs = cmd === 'run_backup' ? RUN_BACKUP_TIMEOUT_MS : undefined;
+      const timeoutMs = cmd === 'run_backup' ? RUN_BACKUP_TIMEOUT_MS
+        : cmd === 'run_pdf_archive_now' ? RUN_PDF_ARCHIVE_TIMEOUT_MS
+        : undefined;
       return { ok: true, result: await callPython(cmd, payload, timeoutMs) };
     } catch (e) {
       return { ok: false, error: e.message };
