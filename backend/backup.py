@@ -110,7 +110,7 @@ def save_config(paths: list, max_keep: int = 20):
 
 def list_rclone_remotes() -> list:
     try:
-        r = subprocess.run([RCLONE_BIN, 'listremotes'], capture_output=True, text=True, timeout=10)
+        r = subprocess.run([RCLONE_BIN, 'listremotes'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=10)
         return [x.strip() for x in r.stdout.splitlines() if x.strip()]
     except Exception:
         return []
@@ -143,7 +143,7 @@ def delete_remote(name: str) -> dict:
     try:
         r = subprocess.run(
             [RCLONE_BIN, 'config', 'delete', name],
-            capture_output=True, text=True, timeout=10
+            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=10
         )
         if r.returncode != 0:
             return {'ok': False, 'error': r.stderr.strip() or r.stdout.strip()}
@@ -255,7 +255,7 @@ def _do_rclone_backup(remote: str, max_keep: int, reason: str = None) -> dict:
         snapshot = _make_compressed_snapshot()
         r = subprocess.run(
             [RCLONE_BIN, 'copyto', snapshot, dest],
-            capture_output=True, text=True, timeout=120
+            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=120
         )
         if r.returncode != 0:
             return {'ok': False, 'error': r.stderr.strip() or r.stdout.strip(), 'folder': remote}
@@ -290,7 +290,7 @@ def _do_rclone_backup(remote: str, max_keep: int, reason: str = None) -> dict:
         for attempt in range(6):
             ls = subprocess.run(
                 [RCLONE_BIN, 'lsjson', remote, *_rclone_include_args()],
-                capture_output=True, text=True, timeout=60
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60
             )
             if ls.returncode != 0:
                 break
@@ -316,7 +316,7 @@ def _list_rclone_backups(remote: str) -> list:
     try:
         r = subprocess.run(
             [RCLONE_BIN, 'lsjson', remote, *_rclone_include_args()],
-            capture_output=True, text=True, timeout=60
+            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60
         )
         if r.returncode != 0:
             return []
@@ -374,7 +374,7 @@ def _check_reachable(folder: str):
         # το remote να απαντάει· αν λείπει μόνο ο υποφάκελος, το copyto τον φτιάχνει.
         remote_root = folder.split(':', 1)[0] + ':'
         try:
-            r = subprocess.run([RCLONE_BIN, 'lsd', remote_root], capture_output=True, text=True, timeout=15)
+            r = subprocess.run([RCLONE_BIN, 'lsd', remote_root], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=15)
         except Exception as e:
             raise RuntimeError(f'Το remote "{folder}" δεν είναι προσβάσιμο: {e}')
         if r.returncode != 0:
@@ -493,7 +493,7 @@ def _backup_pdf_store(dest_root: str) -> dict:
     try:
         r = subprocess.run(
             [RCLONE_BIN, 'copy', str(PDF_STORE_DIR), dest, '--create-empty-src-dirs'],
-            capture_output=True, text=True, timeout=1800
+            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=1800
         )
         if r.returncode != 0:
             return {'ok': False, 'error': r.stderr.strip() or r.stdout.strip(), 'folder': dest_root}
@@ -521,7 +521,7 @@ def _list_pdf_archives(folder: str) -> list:
         try:
             r = subprocess.run(
                 [RCLONE_BIN, 'lsjson', remote_dir, '--include', f'{PDF_ARCHIVE_PREFIX}*{PDF_ARCHIVE_EXT}'],
-                capture_output=True, text=True, timeout=60
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60
             )
             if r.returncode != 0:
                 return []
@@ -614,7 +614,7 @@ def _do_pdf_archive(folder: str, force: bool = False) -> dict:
             dest = f"{folder.rstrip('/')}/{PDF_ARCHIVE_SUBDIR}/{name}"
             r = subprocess.run(
                 [RCLONE_BIN, 'copyto', tmp_zip, dest],
-                capture_output=True, text=True, timeout=1800
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=1800
             )
             if r.returncode != 0:
                 return {'ok': False, 'error': r.stderr.strip() or r.stdout.strip(), 'folder': folder}
@@ -695,7 +695,7 @@ def restore_pdf_store(path: str) -> dict:
             os.close(fd)
             r = subprocess.run(
                 [RCLONE_BIN, 'copyto', path, tmp_download],
-                capture_output=True, text=True, timeout=1800
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=1800
             )
             if r.returncode != 0:
                 return {'ok': False, 'error': r.stderr.strip() or r.stdout.strip()}
@@ -774,7 +774,7 @@ def restore_backup(path: str) -> dict:
                 tmp_path = tmp.name
             r = subprocess.run(
                 [RCLONE_BIN, 'copyto', path, tmp_path],
-                capture_output=True, text=True, timeout=120
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=120
             )
             if r.returncode != 0:
                 return {'ok': False, 'error': r.stderr.strip() or r.stdout.strip()}
