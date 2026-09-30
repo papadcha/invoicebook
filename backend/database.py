@@ -1567,6 +1567,31 @@ def get_staging_batch(batch_label=None, status=None):
         return out
 
 
+def update_staging_row(staging_id, patch):
+    """Επιτρέπει διόρθωση πεδίων επικεφαλίδας (π.χ. doc_date όταν το AI/OCR δεν το
+    διάβασε) σε μια pending γραμμή εισαγωγής, ΠΡΙΝ το confirm -- το confirm_staging_row
+    περνάει το doc_date κατευθείαν σε NOT NULL στήλη, οπότε χωρίς αυτό ο χειριστής
+    έμενε κολλημένος σε ένα γενικό σφάλμα SQLite χωρίς τρόπο να το διορθώσει από το UI.
+    Ενημερώνει μόνο τα κλειδιά επικεφαλίδας του patch μέσα στο αποθηκευμένο raw_json,
+    ποτέ τα 'items' (η επεξεργασία γραμμών γίνεται στην προεπισκόπηση, πριν το staging)."""
+    with get_db() as conn:
+        row = conn.execute('SELECT raw_json, status FROM tbl_import_staging WHERE id=?', (staging_id,)).fetchone()
+        if not row:
+            raise ValueError('Η εγγραφή εισαγωγής δεν βρέθηκε')
+        if row['status'] != 'pending':
+            raise ValueError('Η εγγραφή έχει ήδη επεξεργαστεί')
+        data = json.loads(row['raw_json'])
+        for key, value in patch.items():
+            if key == 'items':
+                continue
+            data[key] = value
+        conn.execute(
+            'UPDATE tbl_import_staging SET raw_json=? WHERE id=?',
+            (json.dumps(data, ensure_ascii=False), staging_id)
+        )
+        return data
+
+
 def confirm_staging_row(staging_id):
     """Καλεί ΚΑΙ το attach_pdf αυτόματα αν το staged JSON έχει source_pdf_path — δεν
     βασιζόμαστε πια αποκλειστικά στο front-end (js/import.js) για αυτό, γιατί οτιδήποτε

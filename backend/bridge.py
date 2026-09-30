@@ -115,6 +115,9 @@ def handle(cmd, payload):
     if cmd == 'get_staging_batch':
         return database.get_staging_batch(payload.get('batch_label'), payload.get('status'))
 
+    if cmd == 'update_staging_row':
+        return database.update_staging_row(_int_id(payload), payload['patch'])
+
     if cmd == 'confirm_staging_row':
         return {'invoice_id': database.confirm_staging_row(_int_id(payload))}
 

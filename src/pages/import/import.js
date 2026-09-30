@@ -214,13 +214,18 @@ async function loadStaging() {
   }
   body.innerHTML = rows.map(r => {
     const d = r.data;
+    const missingDate = !d.doc_date;
     return `
       <tr data-id="${r.id}">
         <td><input type="checkbox" data-staging-select="${r.id}"></td>
         <td>${escapeHtml(r.batch_label || '—')}</td>
         <td>${escapeHtml(d.supplier_name || '—')}</td>
         <td class="mono">${escapeHtml(d.doc_number || '')}</td>
-        <td>${fmtDate(d.doc_date)}</td>
+        <td>
+          <input type="date" class="mono" data-staging-date="${r.id}" value="${d.doc_date || ''}"
+                 style="${missingDate ? 'border-color:var(--danger);' : ''}"
+                 title="${missingDate ? 'Δεν διαβάστηκε ημερομηνία — συμπλήρωσέ την εδώ πριν την επιβεβαίωση' : ''}">
+        </td>
         <td class="text-right mono">${fmtMoney(d.total_amount)}</td>
         <td>
           <button class="btn btn-success btn-sm" data-confirm="${r.id}">Επιβεβαίωση</button>
@@ -229,6 +234,19 @@ async function loadStaging() {
       </tr>
     `;
   }).join('');
+
+  body.querySelectorAll('[data-staging-date]').forEach(input => input.addEventListener('change', async () => {
+    const stagingId = parseInt(input.dataset.stagingDate, 10);
+    const newDate = input.value || null;
+    try {
+      const updated = await pyCallStrict('update_staging_row', { id: stagingId, patch: { doc_date: newDate } });
+      stagingRowsById[stagingId].data = updated;
+      input.style.borderColor = newDate ? '' : 'var(--danger)';
+      input.title = newDate ? '' : 'Δεν διαβάστηκε ημερομηνία — συμπλήρωσέ την εδώ πριν την επιβεβαίωση';
+    } catch (e) {
+      App.toast(e.message, 'fail');
+    }
+  }));
 
   function updateMergeBtnState() {
     const checked = body.querySelectorAll('[data-staging-select]:checked').length;
