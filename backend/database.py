@@ -528,7 +528,7 @@ def _insert_invoice(conn, header, items):
             net_amount, vat_amount, total_amount, payment_method, notes, source_pdf_filename,
             created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-        (header.get('supplier_id'), header.get('doc_type'), header.get('doc_number'),
+        (header.get('supplier_id'), canonical_doc_type(header.get('doc_type')), header.get('doc_number'),
          header['doc_date'], header.get('doc_time'), header.get('customer_name'),
          header.get('customer_vat'), header.get('customer_doy'), header.get('customer_address'),
          header.get('customer_phone'), header.get('net_amount'), header.get('vat_amount'),
@@ -590,7 +590,7 @@ def update_invoice(invoice_id, header, items=None):
                net_amount=?, vat_amount=?, total_amount=?,
                payment_method=?, notes=?, source_pdf_filename=?, updated_at=?
                WHERE id=?''',
-            (header.get('supplier_id'), header.get('doc_type'), header.get('doc_number'),
+            (header.get('supplier_id'), canonical_doc_type(header.get('doc_type')), header.get('doc_number'),
              header['doc_date'], header.get('doc_time'), header.get('customer_name'),
              header.get('customer_vat'), header.get('customer_doy'), header.get('customer_address'),
              header.get('customer_phone'), header.get('net_amount'), header.get('vat_amount'),
@@ -944,6 +944,32 @@ def canonical_unit(unit):
     if unit in CANONICAL_UNITS:
         return unit
     return _UNIT_ALIASES.get(_unit_key(unit), unit)
+
+
+# Όμοια οπτικά λατινικά/κυριλλικά γράμματα → ελληνικά, για τιμές που είναι ΚΥΡΙΩΣ ελληνικό κείμενο
+# (π.χ. doc_type «ΔΕΛΤΙΟ ΑΠΟΣТОΛΗΣ» με κυριλλικά Т/О που έβγαλε το AI). Πεζά: μόνο το ο.
+_TO_GREEK_HOMOGLYPHS = str.maketrans({
+    **dict(zip('ABEHIKMNOPTXYZ', 'ΑΒΕΗΙΚΜΝΟΡΤΧΥΖ')),
+    **dict(zip('АВЕНІКМОРТХУ', 'ΑΒΕΗΙΚΜΟΡΤΧΥ')),
+    'o': 'ο', 'о': 'ο',
+})
+
+
+def canonical_doc_type(doc_type):
+    """Καθαρίζει το doc_type: trim, μονά κενά και — μόνο σε λέξεις που περιέχουν ήδη ελληνικά
+    γράμματα — αντικατάσταση όμοιων λατινικών/κυριλλικών με ελληνικά. Καθαρά λατινικό κείμενο
+    μένει όπως ήρθε· δεν γίνεται καμία σημασιολογική ενοποίηση (πεζά/κεφαλαία κ.λπ.)."""
+    if doc_type is None:
+        return None
+    doc_type = re.sub(r'\s+', ' ', str(doc_type)).strip()
+    if not doc_type:
+        return None
+    # Ανά λέξη: διορθώνεται μόνο λέξη που ΜΙΞΕΙ ελληνικά με όμοια λατινικά/κυριλλικά — μια
+    # ολόκληρη λατινική λέξη (π.χ. «POS») μένει ανέγγιχτη.
+    return ' '.join(
+        w.translate(_TO_GREEK_HOMOGLYPHS) if re.search(r'[Α-Ωα-ωΆ-Ώά-ώ]', w) else w
+        for w in doc_type.split(' ')
+    )
 
 
 def _unit_script(unit):
