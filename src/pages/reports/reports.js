@@ -127,7 +127,7 @@ function computeMonthlyReport(rows) {
     if (!r.doc_date) continue;
     const key = r.doc_date.slice(0, 7); // 'YYYY-MM'
     if (!months.has(key)) {
-      months.set(key, { key, invoiceIds: new Set(), netTotal: 0, vatTotal: 0, grandTotal: 0, qtyByUnit: new Map(), valueByUnit: new Map(), valueTotal: 0 });
+      months.set(key, { key, invoiceIds: new Set(), netTotal: 0, vatTotal: 0, grandTotal: 0, qtyByUnit: new Map(), valueByUnit: new Map(), pricedQtyByUnit: new Map(), unpricedLines: 0, valueTotal: 0 });
     }
     const m = months.get(key);
     m.invoiceIds.add(r.invoice_id);
@@ -138,7 +138,14 @@ function computeMonthlyReport(rows) {
         // η ίδια η ομάδα περιγραφής πρακτικά έχει ήδη μία μονάδα, βλ. σχόλιο πιο πάνω.
         const unit = r.unit || '';
         m.qtyByUnit.set(unit, (m.qtyByUnit.get(unit) || 0) + (r.quantity || 0));
-        m.valueByUnit.set(unit, (m.valueByUnit.get(unit) || 0) + (r.value || 0));
+        // Για τη μέση τιμή μετράνε ΜΟΝΟ γραμμές με πραγματική τιμή (value ≠ null/0) — μια γραμμή
+        // χωρίς τιμή (π.χ. δελτίο αποστολής) θα πρόσθετε ποσότητα με 0 € και θα έριχνε τον μέσο.
+        if (r.value) {
+          m.valueByUnit.set(unit, (m.valueByUnit.get(unit) || 0) + r.value);
+          m.pricedQtyByUnit.set(unit, (m.pricedQtyByUnit.get(unit) || 0) + (r.quantity || 0));
+        } else {
+          m.unpricedLines++;
+        }
       }
       m.valueTotal += r.value || 0;
     } else {
@@ -166,13 +173,15 @@ function fmtQtyByUnit(map) {
 }
 
 // Μέση τιμή = Σ(αξία)/Σ(ποσότητα), ξεχωριστά ανά μονάδα (όπως η ποσότητα — ποτέ μίξη μονάδων).
-// Μονάδα με μηδενική ποσότητα παραλείπεται (καμία διαίρεση με 0).
-function fmtAvgPriceByUnit(qtyMap, valueMap) {
+// qtyMap = μόνο η ποσότητα γραμμών ΜΕ τιμή. Μονάδα με μηδενική ποσότητα παραλείπεται (καμία διαίρεση με 0).
+// Οι γραμμές χωρίς τιμή δεν μπαίνουν στον μέσο — δηλώνεται πόσες παραλείφθηκαν.
+function fmtAvgPriceByUnit(qtyMap, valueMap, unpricedLines = 0) {
   const parts = Array.from(qtyMap.entries())
     .filter(([, qty]) => qty > 0)
     .sort((a, b) => b[1] - a[1])
     .map(([unit, qty]) => `${fmtMoney((valueMap.get(unit) || 0) / qty)}${unit ? ' / ' + unit : ''}`);
-  return parts.length ? parts.join(', ') : '—';
+  const base = parts.length ? parts.join(', ') : '—';
+  return unpricedLines ? `${base} (χωρίς τιμή: ${unpricedLines} γραμμ.)` : base;
 }
 
 function renderMonthlyReport(rows) {
@@ -204,7 +213,7 @@ function renderMonthlyReport(rows) {
         return `<tr><td>${label}</td><td class="text-right mono">${m.invoiceIds.size}</td><td class="text-right mono">${fmtMoney(m.netTotal)}</td><td class="text-right mono">${fmtMoney(m.vatTotal)}</td><td class="text-right mono">${fmtMoney(m.grandTotal)}</td></tr>`;
       }
       return qtyMeaningful
-        ? `<tr><td>${label}</td><td class="text-right mono">${m.invoiceIds.size}</td><td class="text-right mono">${escapeHtml(fmtQtyByUnit(m.qtyByUnit))}</td><td class="text-right mono">${fmtMoney(m.valueTotal)}</td><td class="text-right mono">${escapeHtml(fmtAvgPriceByUnit(m.qtyByUnit, m.valueByUnit))}</td></tr>`
+        ? `<tr><td>${label}</td><td class="text-right mono">${m.invoiceIds.size}</td><td class="text-right mono">${escapeHtml(fmtQtyByUnit(m.qtyByUnit))}</td><td class="text-right mono">${fmtMoney(m.valueTotal)}</td><td class="text-right mono">${escapeHtml(fmtAvgPriceByUnit(m.pricedQtyByUnit, m.valueByUnit, m.unpricedLines))}</td></tr>`
         : `<tr><td>${label}</td><td class="text-right mono">${m.invoiceIds.size}</td><td class="text-right mono">${fmtMoney(m.valueTotal)}</td></tr>`;
     }).join('');
   }
@@ -212,7 +221,11 @@ function renderMonthlyReport(rows) {
   const totalInvoices = new Set(months.flatMap(m => Array.from(m.invoiceIds))).size;
   const grandQtyByUnit = new Map();
   const grandValueByUnit = new Map();
+  const grandPricedQtyByUnit = new Map();
+  let grandUnpricedLines = 0;
   for (const m of months) {
+    grandUnpricedLines += m.unpricedLines;
+    for (const [unit, qty] of m.pricedQtyByUnit) grandPricedQtyByUnit.set(unit, (grandPricedQtyByUnit.get(unit) || 0) + qty);
     for (const [unit, qty] of m.qtyByUnit) grandQtyByUnit.set(unit, (grandQtyByUnit.get(unit) || 0) + qty);
     for (const [unit, val] of m.valueByUnit) grandValueByUnit.set(unit, (grandValueByUnit.get(unit) || 0) + val);
   }
@@ -228,7 +241,7 @@ function renderMonthlyReport(rows) {
         <div class="stat-card"><div class="stat-val">${totalInvoices}</div><div class="stat-label">Τιμολόγια</div></div>
         <div class="stat-card"><div class="stat-val">${escapeHtml(fmtQtyByUnit(grandQtyByUnit))}</div><div class="stat-label">Ποσότητα (σύνολο)</div></div>
         <div class="stat-card"><div class="stat-val">${fmtMoney(months.reduce((s, m) => s + m.valueTotal, 0))}</div><div class="stat-label">Αξία (σύνολο)</div></div>
-        <div class="stat-card"><div class="stat-val">${escapeHtml(fmtAvgPriceByUnit(grandQtyByUnit, grandValueByUnit))}</div><div class="stat-label">Μέση Τιμή</div></div>
+        <div class="stat-card"><div class="stat-val">${escapeHtml(fmtAvgPriceByUnit(grandPricedQtyByUnit, grandValueByUnit, grandUnpricedLines))}</div><div class="stat-label">Μέση Τιμή</div></div>
       `
       : `
         <div class="stat-card"><div class="stat-val">${totalInvoices}</div><div class="stat-label">Τιμολόγια</div></div>
