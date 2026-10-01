@@ -31,6 +31,7 @@ DB_PATH = os.environ.get('INVOICES_DB_PATH') or os.path.join(_data_dir, 'invoice
 import database
 import expvault_export
 import efk_report
+import nitrochem_pdf
 import backup
 database.DB_NAME = DB_PATH
 database.PDF_STORE_DIR = os.path.join(os.path.dirname(DB_PATH), 'pdf_store')
@@ -70,6 +71,9 @@ def _load_ai_json_text(text):
 def _parse_import_file(file_path):
     """Επιστρέφει λίστα από dict (ένα ανά τιμολόγιο), με προαιρετικό 'items'."""
     ext = os.path.splitext(file_path)[1].lower()
+    if ext == '.pdf':
+        # Ηλεκτρονικό PDF NITROCHEM (text layer) — deterministic parser, χωρίς AI.
+        return [nitrochem_pdf.parse_pdf(file_path)]
     if ext == '.json':
         with open(file_path, 'r', encoding='utf-8') as f:
             data = _load_ai_json_text(f.read())
@@ -145,6 +149,10 @@ def handle(cmd, payload):
 
     if cmd == 'parse_import_file':
         return _parse_import_file(payload['file_path'])
+
+    if cmd == 'parse_import_files':
+        # Πολλά PDF NITROCHEM μαζί — ένα προβληματικό δεν ακυρώνει τα υπόλοιπα (rows + errors).
+        return nitrochem_pdf.parse_pdfs(payload['file_paths'])
 
     if cmd == 'stage_rows':
         return database.import_staging_rows(

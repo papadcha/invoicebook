@@ -135,7 +135,7 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'get_orphan_suppliers', 'delete_orphan_suppliers', 'get_suppliers_with_invalid_vat',
   'get_invoice', 'delete_invoice', 'attach_pdf',
   'import_staging_file', 'get_staging_batch', 'update_staging_row', 'confirm_staging_row', 'reject_staging_row',
-  'parse_import_file', 'stage_rows', 'list_categories', 'list_machines',
+  'parse_import_file', 'parse_import_files', 'stage_rows', 'list_categories', 'list_machines',
   'find_duplicate_invoice', 'merge_documents',
   'get_supplier_merge_candidates', 'get_supplier_merge_preview', 'merge_suppliers',
   'get_description_merge_candidates', 'merge_item_descriptions',
@@ -178,6 +178,14 @@ function setupIPC() {
       properties: ['openFile'],
     });
     return canceled ? null : filePaths[0];
+  });
+
+  ipcMain.handle('open-import-pdfs-dialog', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      filters: [{ name: 'PDF τιμολογίων NITROCHEM', extensions: ['pdf'] }],
+      properties: ['openFile', 'multiSelections'],
+    });
+    return canceled ? null : filePaths;
   });
 
   ipcMain.handle('save-json-dialog', async (event, defaultName) => {

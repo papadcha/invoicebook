@@ -105,6 +105,27 @@ document.getElementById('pick-file-btn').addEventListener('click', async () => {
   }
 });
 
+document.getElementById('pick-pdfs-btn').addEventListener('click', async () => {
+  const paths = await window.api.openImportPdfs();
+  if (!paths || !paths.length) return;
+  document.getElementById('picked-file-name').textContent = `${paths.length} PDF NITROCHEM`;
+  const unlock = _lock(document.getElementById('pick-pdfs-btn'));
+  try {
+    const { rows, errors } = await pyCallStrict('parse_import_files', { file_paths: paths });
+    previewInvoices = rows.map(r => ({ ...r, items: (r.items || []).map(it => ({ ...it })) }));
+    renderPreview();
+    if (errors.length) {
+      App.toast(`${errors.length} PDF δεν διαβάστηκαν: ${errors.map(e => `${e.file} (${e.error})`).join(' · ')}`, 'fail');
+    }
+    const warned = rows.filter(r => r.parse_warnings && r.parse_warnings.length).length;
+    if (warned) App.toast(`${warned} παραστατικά με προειδοποίηση — δες την προεπισκόπηση`, 'warn');
+  } catch (e) {
+    App.toast(e.message, 'fail');
+  } finally {
+    unlock();
+  }
+});
+
 function qtyLabel(it) {
   if (it.quantity === null || it.quantity === undefined || it.quantity === '') return '—';
   return `${fmtQty(it.quantity)}${it.unit ? ' ' + it.unit : ''}`;
@@ -122,13 +143,20 @@ function renderPreview() {
 
   const body = document.getElementById('preview-body');
   body.innerHTML = previewInvoices.map((inv, invIdx) => {
-    const headerRow = previewInvoices.length > 1
-      ? `<tr><td colspan="6" style="background:var(--bg); font-weight:600; font-size:12px; color:var(--navy2);">${escapeHtml(inv.supplier_name || '—')} — ${escapeHtml(fmtDate(inv.doc_date) || '—')} (${escapeHtml(inv.doc_number || '—')})</td></tr>`
+    const refInfo = [
+      inv.doc_type,
+      inv.ref_doc_number ? `Σχετ.: ${inv.ref_doc_number}${inv.ref_doc_date ? ' ' + fmtDate(inv.ref_doc_date) : ''}` : null,
+      inv.own_doc_number ? `Δικό μας Δ.Α.: ${inv.own_doc_number}` : null,
+    ].filter(Boolean).join(' · ');
+    const warnInfo = (inv.parse_warnings || []).map(w => `<div style="color:var(--warn, #b45309); font-weight:500;">⚠ ${escapeHtml(w)}</div>`).join('');
+    const headerRow = (previewInvoices.length > 1 || refInfo || warnInfo)
+      ? `<tr><td colspan="7" style="background:var(--bg); font-weight:600; font-size:12px; color:var(--navy2);">${escapeHtml(inv.supplier_name || '—')} — ${escapeHtml(fmtDate(inv.doc_date) || '—')} (${escapeHtml(inv.doc_number || '—')})${refInfo ? ` <span style="font-weight:400;">· ${escapeHtml(refInfo)}</span>` : ''}${warnInfo}</td></tr>`
       : '';
     const itemRows = inv.items.map((it, itIdx) => `
       <tr data-inv="${invIdx}" data-it="${itIdx}">
         <td>${escapeHtml(it.description || '')}</td>
         <td class="mono">${qtyLabel(it)}</td>
+        <td class="mono text-right">${it.value != null && it.value !== '' ? fmtMoney(it.value) : '—'}</td>
         <td><input class="it-category" type="text" list="category-options" value="${escapeHtml(it.category || '')}" data-f="category" style="width:150px;"></td>
         <td><input class="it-machine" type="text" value="${escapeHtml(it.machine_name || '')}" data-f="machine_name" style="width:150px;"></td>
         <td style="text-align:center;"><input type="checkbox" data-f="efk_eligible" ${it.efk_eligible ? 'checked' : ''}></td>

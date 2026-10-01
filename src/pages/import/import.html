@@ -2,6 +2,7 @@
   <div style="display:flex; gap:8px; align-items:center;">
     <button type="button" class="btn btn-accent" id="copy-prompt-btn">📋 Αντιγραφή AI Prompt</button>
     <button type="button" class="btn btn-outline" id="pick-file-btn">Επιλογή Αρχείου (CSV/JSON)</button>
+    <button type="button" class="btn btn-outline" id="pick-pdfs-btn" title="Ηλεκτρονικά PDF τιμολογίων/πιστωτικών NITROCHEM — διαβάζονται απευθείας, χωρίς AI">📄 PDF NITROCHEM (πολλά)</button>
     <span id="picked-file-name" class="mono" style="font-size:12px; color:var(--muted);">Κανένα αρχείο</span>
     <div style="flex-grow:1;"></div>
     <label for="batch-label" style="margin:0; white-space:nowrap;">Ετικέτα Παρτίδας</label>
@@ -18,7 +19,7 @@
   <div class="table-wrap">
     <table class="items-table">
       <thead><tr>
-        <th>Περιγραφή</th><th>Ποσότητα</th><th>Κατηγορία</th><th>Μηχάνημα</th>
+        <th>Περιγραφή</th><th>Ποσότητα</th><th>Αξία</th><th>Κατηγορία</th><th>Μηχάνημα</th>
         <th style="text-align:center;">ΕΦΚ</th><th style="text-align:center;">Bulk</th>
       </tr></thead>
       <tbody id="preview-body"></tbody>
