@@ -423,6 +423,68 @@ document.getElementById('efk-generate-btn').addEventListener('click', async () =
   }
 });
 
+// ── ΚΑΤΑΝΟΜΕΣ ΑΝΑ ΜΗΧΑΝΗΜΑ ───────────────────────────────────────────────────
+// Χρονολογική λίστα (νεότερες πρώτα), ένα event ανά γραμμή tbl_allocations — ΟΧΙ άθροιση
+// ανά μηχάνημα. Το σύνολο ποσότητας δείχνεται ξεχωριστά ανά μονάδα (ποτέ μίξη μονάδων).
+let allocRows = [];
+
+function populateAllocMachineFilter() {
+  const select = document.getElementById('alloc-machine-filter');
+  const current = select.value;
+  const names = [...new Set(allocRows.map(r => r.machine_name || ''))]
+    .sort((a, b) => a.localeCompare(b, 'el'));
+  select.innerHTML = '<option value="">Όλα</option>' +
+    names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n || '(χωρίς μηχάνημα)')}</option>`).join('');
+  if (names.includes(current)) select.value = current;
+}
+
+function applyAllocFilter() {
+  const machine = document.getElementById('alloc-machine-filter').value;
+  const q = normalizeGreek(document.getElementById('alloc-search').value);
+  const from = document.getElementById('alloc-date-from').value;
+  const to = document.getElementById('alloc-date-to').value;
+
+  const filtered = allocRows.filter(r => {
+    if (machine && (r.machine_name || '') !== machine) return false;
+    if (q && !normalizeGreek(`${r.description || ''} ${r.supplier_name || ''} ${r.doc_number || ''} ${r.notes || ''}`).includes(q)) return false;
+    if (from && (!r.allocation_date || r.allocation_date < from)) return false;
+    if (to && (!r.allocation_date || r.allocation_date > to)) return false;
+    return true;
+  });
+
+  const body = document.getElementById('alloc-body');
+  const note = document.getElementById('alloc-result-note');
+  if (!filtered.length) {
+    note.textContent = '';
+    body.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="icon">🚜</div><p>Καμία κατανομή.</p></div></td></tr>`;
+    return;
+  }
+  const totals = new Map();
+  for (const r of filtered) totals.set(r.unit || '', (totals.get(r.unit || '') || 0) + (r.quantity || 0));
+  note.textContent = `${filtered.length} κατανομές — σύνολο: ${fmtQtyByUnit(totals)}`;
+  body.innerHTML = filtered.map(r => `
+    <tr>
+      <td class="mono">${escapeHtml(r.allocation_date ? fmtDate(r.allocation_date) : '—')}</td>
+      <td>${escapeHtml(r.machine_name || '—')}</td>
+      <td class="mono text-right">${fmtQty(r.quantity)}${r.unit ? ' ' + escapeHtml(r.unit) : ''}</td>
+      <td>${escapeHtml(r.description || '—')}</td>
+      <td>${escapeHtml(r.supplier_name || '—')} <span class="mono">${escapeHtml(r.doc_number || '')}</span></td>
+      <td>${escapeHtml(r.notes || '')}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadAllocations() {
+  allocRows = await pyCall('list_allocations', {}) || [];
+  populateAllocMachineFilter();
+  applyAllocFilter();
+}
+
+document.getElementById('alloc-machine-filter').addEventListener('change', applyAllocFilter);
+document.getElementById('alloc-search').addEventListener('input', applyAllocFilter);
+document.getElementById('alloc-date-from').addEventListener('change', applyAllocFilter);
+document.getElementById('alloc-date-to').addEventListener('change', applyAllocFilter);
+
 // ── ΥΠΟ-TABS ─────────────────────────────────────────────────────────────────
 // Μηνιαία Αναφορά / ΕΦΚ+Καύσιμα σε ξεχωριστά tabs (2026-09-26) — πριν ήταν στοιβαγμένες
 // κάρτες, χρειαζόταν scroll για να φανεί το ΕΦΚ.
@@ -436,3 +498,4 @@ document.querySelectorAll('.tab-bar .tab-item').forEach(tab => {
 });
 
 loadReports();
+loadAllocations();

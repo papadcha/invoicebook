@@ -1904,6 +1904,25 @@ def list_open_bulk_pools():
         return pools
 
 
+def list_allocations():
+    """Όλες οι κατανομές (ανοιχτών ΚΑΙ κλειστών αποθεμάτων), μία γραμμή ανά κατανομή —
+    χρονολογική λίστα για τις Αναφορές, καμία άθροιση (βλ. TODO.md, ιδέα 2026-09-25)."""
+    with get_db() as conn:
+        rows = conn.execute(
+            '''SELECT a.id, a.pool_id, a.allocation_date, a.quantity, a.notes,
+                      m.name AS machine_name, p.unit, p.category, p.closed,
+                      it.description, i.doc_number, i.doc_date, s.name AS supplier_name
+               FROM tbl_allocations a
+               JOIN tbl_bulk_pools p ON p.id = a.pool_id
+               JOIN tbl_invoice_items it ON it.id = p.invoice_item_id
+               JOIN tbl_invoices i ON i.id = it.invoice_id
+               LEFT JOIN tbl_suppliers s ON s.id = i.supplier_id
+               LEFT JOIN tbl_machines m ON m.id = a.machine_id
+               ORDER BY a.allocation_date DESC, a.id DESC'''
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 def add_allocation(pool_id, machine_name, quantity, allocation_date, notes=None):
     if quantity is None or quantity <= 0:
         raise ValueError('Η ποσότητα κατανομής πρέπει να είναι θετικός αριθμός')

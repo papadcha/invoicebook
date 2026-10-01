@@ -318,6 +318,9 @@ def handle(cmd, payload):
     if cmd == 'list_open_bulk_pools':
         return database.list_open_bulk_pools()
 
+    if cmd == 'list_allocations':
+        return database.list_allocations()
+
     if cmd == 'add_allocation':
         return database.add_allocation(
             _int_id(payload, 'pool_id'), payload.get('machine_name'), payload['quantity'],

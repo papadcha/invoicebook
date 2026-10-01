@@ -153,7 +153,7 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'list_backups', 'restore_backup', 'list_pdf_archives', 'run_pdf_archive_now',
   'restore_pdf_store', 'list_rclone_remotes', 'list_remotes_detail', 'delete_remote',
   'list_manual_snapshots', 'prune_manual_snapshots',
-  'list_open_bulk_pools', 'add_allocation', 'close_bulk_pool', 'delete_bulk_pool',
+  'list_open_bulk_pools', 'list_allocations', 'add_allocation', 'close_bulk_pool', 'delete_bulk_pool',
   'update_allocation', 'delete_allocation', 'merge_bulk_pools',
 ]);
 

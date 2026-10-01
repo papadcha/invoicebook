@@ -9,6 +9,7 @@
 <div class="tab-bar">
   <div class="tab-item active" data-tab="monthly">Μηνιαία Αναφορά</div>
   <div class="tab-item" data-tab="fuel">⛽ ΕΦΚ / Καύσιμα</div>
+  <div class="tab-item" data-tab="allocations">🚜 Κατανομές</div>
 </div>
 
 <div class="tab-panel active" id="tab-monthly">
@@ -50,6 +51,42 @@
     <table id="reports-table">
       <thead></thead>
       <tbody id="reports-body"></tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- Χρονολογική λίστα κατανομών bulk αποθεμάτων (π.χ. δεξαμενή πετρελαίου) ανά μηχάνημα —
+     ένα event ανά γραμμή του tbl_allocations, χωρίς άθροιση ανά μηχάνημα. -->
+<div class="tab-panel" id="tab-allocations">
+<div class="card">
+  <div class="card-title">🚜 Κατανομές ανά μηχάνημα</div>
+  <div class="form-row cols-4">
+    <div class="field-inline">
+      <label for="alloc-machine-filter">Μηχάνημα</label>
+      <select id="alloc-machine-filter"><option value="">Όλα</option></select>
+    </div>
+    <div class="field-inline">
+      <label for="alloc-search" title="είδος / προμηθευτής / αρ. παραστατικού / σημειώσεις">Αναζήτηση</label>
+      <input type="text" id="alloc-search" placeholder="π.χ. πετρέλαιο">
+    </div>
+    <div class="field-inline">
+      <label for="alloc-date-from">Από</label>
+      <input type="date" id="alloc-date-from">
+    </div>
+    <div class="field-inline">
+      <label for="alloc-date-to">Έως</label>
+      <input type="date" id="alloc-date-to">
+    </div>
+  </div>
+  <div id="alloc-result-note" style="font-size:12px;color:var(--muted);margin-bottom:6px;"></div>
+  <div class="table-wrap">
+    <table id="alloc-table">
+      <thead><tr>
+        <th>Ημ/νία</th><th>Μηχάνημα</th><th class="text-right">Ποσότητα</th><th>Είδος</th>
+        <th>Τιμολόγιο</th><th>Σημειώσεις</th>
+      </tr></thead>
+      <tbody id="alloc-body"></tbody>
     </table>
   </div>
 </div>
