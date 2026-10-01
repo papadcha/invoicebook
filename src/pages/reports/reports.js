@@ -127,7 +127,7 @@ function computeMonthlyReport(rows) {
     if (!r.doc_date) continue;
     const key = r.doc_date.slice(0, 7); // 'YYYY-MM'
     if (!months.has(key)) {
-      months.set(key, { key, invoiceIds: new Set(), netTotal: 0, vatTotal: 0, grandTotal: 0, qtyByUnit: new Map(), valueTotal: 0 });
+      months.set(key, { key, invoiceIds: new Set(), netTotal: 0, vatTotal: 0, grandTotal: 0, qtyByUnit: new Map(), valueByUnit: new Map(), valueTotal: 0 });
     }
     const m = months.get(key);
     m.invoiceIds.add(r.invoice_id);
@@ -138,6 +138,7 @@ function computeMonthlyReport(rows) {
         // η ίδια η ομάδα περιγραφής πρακτικά έχει ήδη μία μονάδα, βλ. σχόλιο πιο πάνω.
         const unit = r.unit || '';
         m.qtyByUnit.set(unit, (m.qtyByUnit.get(unit) || 0) + (r.quantity || 0));
+        m.valueByUnit.set(unit, (m.valueByUnit.get(unit) || 0) + (r.value || 0));
       }
       m.valueTotal += r.value || 0;
     } else {
@@ -164,23 +165,33 @@ function fmtQtyByUnit(map) {
     .join(', ');
 }
 
+// Μέση τιμή = Σ(αξία)/Σ(ποσότητα), ξεχωριστά ανά μονάδα (όπως η ποσότητα — ποτέ μίξη μονάδων).
+// Μονάδα με μηδενική ποσότητα παραλείπεται (καμία διαίρεση με 0).
+function fmtAvgPriceByUnit(qtyMap, valueMap) {
+  const parts = Array.from(qtyMap.entries())
+    .filter(([, qty]) => qty > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([unit, qty]) => `${fmtMoney((valueMap.get(unit) || 0) / qty)}${unit ? ' / ' + unit : ''}`);
+  return parts.length ? parts.join(', ') : '—';
+}
+
 function renderMonthlyReport(rows) {
   const { lineLevel, qtyMeaningful, months } = computeMonthlyReport(rows);
   const table = document.getElementById('reports-table');
   const body = document.getElementById('reports-body');
   const scopeNote = document.getElementById('reports-scope-note');
-  const cols = !lineLevel ? 5 : (qtyMeaningful ? 4 : 3);
+  const cols = !lineLevel ? 5 : (qtyMeaningful ? 5 : 3);
 
   scopeNote.textContent = !lineLevel
     ? 'Ποσά τιμολογίου (καθ. αξία/ΦΠΑ/σύνολο), ένα τιμολόγιο μετράει μία φορά'
     : qtyMeaningful
-      ? 'Ποσότητα/αξία ανά γραμμή (όχι τα ποσά τιμολογίου, αφορούν ολόκληρο το παραστατικό) — ενεργό φίλτρο περιγραφής'
+      ? 'Ποσότητα/αξία/μέση τιμή ανά γραμμή (όχι τα ποσά τιμολογίου, αφορούν ολόκληρο το παραστατικό) — ενεργό φίλτρο περιγραφής'
       : 'Αξία ανά γραμμή, χωρίς ποσότητα (όχι τα ποσά τιμολογίου, αφορούν ολόκληρο το παραστατικό) — η ποσότητα δεν αθροίζεται χωρίς ενεργό φίλτρο περιγραφής, αφού κατηγορία/μηχάνημα από μόνα τους μπορεί να καλύπτουν εντελώς διαφορετικά προϊόντα';
 
   table.querySelector('thead').innerHTML = !lineLevel
     ? `<tr><th>Μήνας</th><th class="text-right">Τιμολόγια</th><th class="text-right">Καθαρή Αξία</th><th class="text-right">ΦΠΑ</th><th class="text-right">Σύνολο</th></tr>`
     : qtyMeaningful
-      ? `<tr><th>Μήνας</th><th class="text-right">Τιμολόγια</th><th class="text-right">Ποσότητα</th><th class="text-right">Αξία</th></tr>`
+      ? `<tr><th>Μήνας</th><th class="text-right">Τιμολόγια</th><th class="text-right">Ποσότητα</th><th class="text-right">Αξία</th><th class="text-right">Μέση Τιμή</th></tr>`
       : `<tr><th>Μήνας</th><th class="text-right">Τιμολόγια</th><th class="text-right">Αξία</th></tr>`;
 
   if (!months.length) {
@@ -193,15 +204,17 @@ function renderMonthlyReport(rows) {
         return `<tr><td>${label}</td><td class="text-right mono">${m.invoiceIds.size}</td><td class="text-right mono">${fmtMoney(m.netTotal)}</td><td class="text-right mono">${fmtMoney(m.vatTotal)}</td><td class="text-right mono">${fmtMoney(m.grandTotal)}</td></tr>`;
       }
       return qtyMeaningful
-        ? `<tr><td>${label}</td><td class="text-right mono">${m.invoiceIds.size}</td><td class="text-right mono">${escapeHtml(fmtQtyByUnit(m.qtyByUnit))}</td><td class="text-right mono">${fmtMoney(m.valueTotal)}</td></tr>`
+        ? `<tr><td>${label}</td><td class="text-right mono">${m.invoiceIds.size}</td><td class="text-right mono">${escapeHtml(fmtQtyByUnit(m.qtyByUnit))}</td><td class="text-right mono">${fmtMoney(m.valueTotal)}</td><td class="text-right mono">${escapeHtml(fmtAvgPriceByUnit(m.qtyByUnit, m.valueByUnit))}</td></tr>`
         : `<tr><td>${label}</td><td class="text-right mono">${m.invoiceIds.size}</td><td class="text-right mono">${fmtMoney(m.valueTotal)}</td></tr>`;
     }).join('');
   }
 
   const totalInvoices = new Set(months.flatMap(m => Array.from(m.invoiceIds))).size;
   const grandQtyByUnit = new Map();
+  const grandValueByUnit = new Map();
   for (const m of months) {
     for (const [unit, qty] of m.qtyByUnit) grandQtyByUnit.set(unit, (grandQtyByUnit.get(unit) || 0) + qty);
+    for (const [unit, val] of m.valueByUnit) grandValueByUnit.set(unit, (grandValueByUnit.get(unit) || 0) + val);
   }
   document.getElementById('reports-stats').innerHTML = !lineLevel
     ? `
@@ -215,6 +228,7 @@ function renderMonthlyReport(rows) {
         <div class="stat-card"><div class="stat-val">${totalInvoices}</div><div class="stat-label">Τιμολόγια</div></div>
         <div class="stat-card"><div class="stat-val">${escapeHtml(fmtQtyByUnit(grandQtyByUnit))}</div><div class="stat-label">Ποσότητα (σύνολο)</div></div>
         <div class="stat-card"><div class="stat-val">${fmtMoney(months.reduce((s, m) => s + m.valueTotal, 0))}</div><div class="stat-label">Αξία (σύνολο)</div></div>
+        <div class="stat-card"><div class="stat-val">${escapeHtml(fmtAvgPriceByUnit(grandQtyByUnit, grandValueByUnit))}</div><div class="stat-label">Μέση Τιμή</div></div>
       `
       : `
         <div class="stat-card"><div class="stat-val">${totalInvoices}</div><div class="stat-label">Τιμολόγια</div></div>
