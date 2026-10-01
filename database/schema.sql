@@ -27,7 +27,10 @@ CREATE TABLE tbl_invoices (
   notes TEXT,
   source_pdf_filename TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  ref_doc_number TEXT,   -- «Σχετ. Παραστ.» (Δ.Α. που αναφέρει το τιμολόγιο), βλ. migration 007
+  ref_doc_date TEXT,
+  own_doc_number TEXT    -- μόνο πιστωτικά: δικό μας Δ.Α. επιστροφής
 );
 
 -- "Μπιτόνι"/"Απόθεμα" είναι απλά μία ακόμα εγγραφή εδώ, όχι πραγματικό μηχάνημα —

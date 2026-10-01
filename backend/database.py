@@ -22,7 +22,7 @@ _local_db_dir = os.path.dirname(os.path.abspath(__file__ + '/../database'))
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database', 'schema.sql')
 MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database')
 
-CURRENT_SCHEMA_VERSION = 6
+CURRENT_SCHEMA_VERSION = 7
 
 migration_files = {
     1: os.path.join(MIGRATIONS_DIR, 'migration_001_initial_schema.sql'),
@@ -31,6 +31,7 @@ migration_files = {
     4: os.path.join(MIGRATIONS_DIR, 'migration_004_dismissed_merge_candidates.sql'),
     5: os.path.join(MIGRATIONS_DIR, 'migration_005_pdf_hashes.sql'),
     6: os.path.join(MIGRATIONS_DIR, 'migration_006_invoice_exports.sql'),
+    7: os.path.join(MIGRATIONS_DIR, 'migration_007_invoice_ref_docs.sql'),
 }
 
 
@@ -526,14 +527,16 @@ def _insert_invoice(conn, header, items):
            (supplier_id, doc_type, doc_number, doc_date, doc_time, customer_name, customer_vat,
             customer_doy, customer_address, customer_phone,
             net_amount, vat_amount, total_amount, payment_method, notes, source_pdf_filename,
-            created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            created_at, updated_at, ref_doc_number, ref_doc_date, own_doc_number)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
         (header.get('supplier_id'), canonical_doc_type(header.get('doc_type')), header.get('doc_number'),
          header['doc_date'], header.get('doc_time'), header.get('customer_name'),
          header.get('customer_vat'), header.get('customer_doy'), header.get('customer_address'),
          header.get('customer_phone'), header.get('net_amount'), header.get('vat_amount'),
          header.get('total_amount'), header.get('payment_method'), header.get('notes'),
-         header.get('source_pdf_filename'), now, now)
+         header.get('source_pdf_filename'), now, now,
+         canonical_ref_doc(header.get('ref_doc_number')), canonical_ref_date(header.get('ref_doc_date')),
+         canonical_own_doc(header.get('own_doc_number')))
     )
     invoice_id = cur.lastrowid
     for it in (items or []):
@@ -576,6 +579,13 @@ def update_invoice(invoice_id, header, items=None):
         if 'source_pdf_filename' not in header:
             row = conn.execute('SELECT source_pdf_filename FROM tbl_invoices WHERE id=?', (invoice_id,)).fetchone()
             header = {**header, 'source_pdf_filename': row['source_pdf_filename'] if row else None}
+        # Τα πεδία σχετικών παραστατικών (migration 007) που ο caller δεν στέλνει ΜΕΝΟΥΝ ως έχουν
+        # (ίδιο μοτίβο με το source_pdf_filename) — αλλιώς ένα edit από διαδρομή που δεν τα ξέρει θα τα έσβηνε.
+        missing_ref = [k for k in ('ref_doc_number', 'ref_doc_date', 'own_doc_number') if k not in header]
+        if missing_ref:
+            row = conn.execute('SELECT ref_doc_number, ref_doc_date, own_doc_number FROM tbl_invoices WHERE id=?',
+                               (invoice_id,)).fetchone()
+            header = {**header, **{k: (row[k] if row else None) for k in missing_ref}}
         duplicate = _find_duplicate(conn, header, exclude_id=invoice_id)
         if duplicate is not None:
             raise ValueError(
@@ -588,14 +598,17 @@ def update_invoice(invoice_id, header, items=None):
                supplier_id=?, doc_type=?, doc_number=?, doc_date=?, doc_time=?,
                customer_name=?, customer_vat=?, customer_doy=?, customer_address=?, customer_phone=?,
                net_amount=?, vat_amount=?, total_amount=?,
-               payment_method=?, notes=?, source_pdf_filename=?, updated_at=?
+               payment_method=?, notes=?, source_pdf_filename=?, updated_at=?,
+               ref_doc_number=?, ref_doc_date=?, own_doc_number=?
                WHERE id=?''',
             (header.get('supplier_id'), canonical_doc_type(header.get('doc_type')), header.get('doc_number'),
              header['doc_date'], header.get('doc_time'), header.get('customer_name'),
              header.get('customer_vat'), header.get('customer_doy'), header.get('customer_address'),
              header.get('customer_phone'), header.get('net_amount'), header.get('vat_amount'),
              header.get('total_amount'), header.get('payment_method'), header.get('notes'),
-             header.get('source_pdf_filename'), _now(), invoice_id)
+             header.get('source_pdf_filename'), _now(),
+             canonical_ref_doc(header.get('ref_doc_number')), canonical_ref_date(header.get('ref_doc_date')),
+             canonical_own_doc(header.get('own_doc_number')), invoice_id)
         )
         _sync_pdf_filename(conn, invoice_id)
 
@@ -984,6 +997,34 @@ def canonical_doc_type(doc_type):
         for w in doc_type.split(' ')
     )
     return _DOC_TYPE_ALIASES.get(_doc_type_key(doc_type), doc_type)
+
+
+def canonical_ref_doc(value):
+    """«Σχετ. Παραστατικό» όπως τυπώνεται (π.χ. «ΔΙΧΝ - 19586») → «ΔΙΧΝ 19586»: μονά κενά, χωρίς
+    παύλα μεταξύ προθέματος και αριθμού (ίδια μορφή με του expvault). Κενό → None."""
+    if value is None or not str(value).strip():
+        return None
+    return re.sub(r'\s+', ' ', re.sub(r'\s*[-–]\s*', ' ', str(value))).strip()
+
+
+def canonical_own_doc(value):
+    """Δικό μας Δ.Α. επιστροφής: όπως το canonical_ref_doc + χωρίς μηδενικά μπροστά από τον
+    αριθμό («ΔΕ 010» → «ΔΕ 10»), ώστε ο ίδιος αριθμός να γράφεται πάντα ίδια."""
+    value = canonical_ref_doc(value)
+    if value is None:
+        return None
+    m = re.match(r'^(\D+?)\s*0*(\d+)$', value)
+    return f'{m.group(1).strip()} {int(m.group(2))}' if m else value
+
+
+def canonical_ref_date(value):
+    """«6/3/2026» ή «06-03-2026» → «2026-03-06» (ISO, όπως doc_date)· ήδη-ISO μένει, κενό → None,
+    ό,τι δεν αναγνωρίζεται μένει όπως ήρθε."""
+    if value is None or not str(value).strip():
+        return None
+    value = str(value).strip()
+    m = re.match(r'^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})$', value)
+    return f'{m.group(3)}-{int(m.group(2)):02d}-{int(m.group(1)):02d}' if m else value
 
 
 def _unit_script(unit):
@@ -1482,6 +1523,8 @@ def _resolve_header(conn, data):
         'payment_method': data.get('payment_method'),
         'notes': data.get('notes'),
         'source_pdf_filename': data.get('source_pdf_filename'),
+        # μόνο αν υπάρχουν στο data — αλλιώς το update_invoice διατηρεί ό,τι είναι ήδη αποθηκευμένο
+        **{k: data[k] for k in ('ref_doc_number', 'ref_doc_date', 'own_doc_number') if k in data},
     }
 
 

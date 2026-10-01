@@ -525,6 +525,9 @@ async function openEditInvoice(invoiceId) {
   document.getElementById('edit-supplier-vat').value = supplier ? (supplier.vat_number || '') : '';
   document.getElementById('edit-doc-type').value = inv.doc_type || '';
   document.getElementById('edit-doc-number').value = inv.doc_number || '';
+  document.getElementById('edit-ref-doc-number').value = inv.ref_doc_number || '';
+  document.getElementById('edit-ref-doc-date').value = inv.ref_doc_date || '';
+  document.getElementById('edit-own-doc-number').value = inv.own_doc_number || '';
   document.getElementById('edit-doc-date').value = inv.doc_date || '';
   document.getElementById('edit-doc-time').value = inv.doc_time || '';
   document.getElementById('edit-customer-name').value = inv.customer_name || '';
@@ -556,6 +559,9 @@ function openNewInvoice() {
   document.getElementById('edit-supplier-vat').value = '';
   document.getElementById('edit-doc-type').value = '';
   document.getElementById('edit-doc-number').value = '';
+  document.getElementById('edit-ref-doc-number').value = '';
+  document.getElementById('edit-ref-doc-date').value = '';
+  document.getElementById('edit-own-doc-number').value = '';
   document.getElementById('edit-doc-date').value = todayInput();
   document.getElementById('edit-doc-time').value = '';
   document.getElementById('edit-customer-name').value = '';
@@ -650,6 +656,9 @@ document.getElementById('edit-invoice-save-btn').addEventListener('click', async
     supplier_vat: document.getElementById('edit-supplier-vat').value || null,
     doc_type: document.getElementById('edit-doc-type').value || null,
     doc_number: document.getElementById('edit-doc-number').value || null,
+    ref_doc_number: document.getElementById('edit-ref-doc-number').value || null,
+    ref_doc_date: document.getElementById('edit-ref-doc-date').value || null,
+    own_doc_number: document.getElementById('edit-own-doc-number').value || null,
     doc_date: document.getElementById('edit-doc-date').value || null,
     doc_time: document.getElementById('edit-doc-time').value || null,
     customer_name: document.getElementById('edit-customer-name').value || null,
