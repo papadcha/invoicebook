@@ -111,6 +111,18 @@ function applyReportsFilters() {
 //   header amounts — ένα τιμολόγιο εμφανίζεται ΠΟΛΛΕΣ φορές (μία ανά γραμμή) στα rows, άρα
 //   ΠΡΕΠΕΙ να γίνει dedupe ανά invoice_id πριν το άθροισμα, αλλιώς πολλαπλασιάζεται το ποσό
 //   όσες γραμμές έχει το τιμολόγιο.
+// Πιστωτικά: αφαιρούνται από τα αθροίσματα (ποσότητα, αξία γραμμής, ποσά κεφαλίδας) ΑΝΑ τύπο
+// εγγράφου, με ΑΠΟΛΥΤΗ τιμή — τα υπάρχοντα πιστωτικά στη βάση έχουν ασυνεπές πρόσημο (6 αρνητικά,
+// 4 θετικά), ενώ τα νέα έχουν αρνητική κεφαλίδα και θετικές γραμμές. Έτσι δουλεύουν όλα χωρίς
+// να αγγιχτούν παλιά δεδομένα (απόφαση χρήστη 2026-10-01, «Α»).
+function isCreditNote(r) {
+  return /πιστωτικ/.test(normalizeGreek(r.doc_type || ''));
+}
+function signedAbs(v, credit) {
+  if (v === null || v === undefined || v === '') return v;
+  return credit ? -Math.abs(v) : v;
+}
+
 function computeMonthlyReport(rows) {
   const lineLevel = !!(reportsCategoryFilter || reportsMachineNameFilter || reportsDescriptionGroupFilter);
   // Η ΠΟΣΟΤΗΤΑ έχει νόημα να αθροιστεί μόνο όταν είναι ενεργό το φίλτρο Περιγραφής —
@@ -123,8 +135,18 @@ function computeMonthlyReport(rows) {
   const months = new Map();
 
   const seenInvoicePerMonth = new Set();
-  for (const r of rows) {
-    if (!r.doc_date) continue;
+  const creditIds = new Set();
+  for (const r0 of rows) {
+    if (!r0.doc_date) continue;
+    const credit = isCreditNote(r0);
+    if (credit) creditIds.add(r0.invoice_id);
+    // r: αντίγραφο με πρόσημο εφαρμοσμένο· οι υπόλοιποι υπολογισμοί παρακάτω δουλεύουν όπως πριν.
+    const r = credit ? {
+      ...r0,
+      quantity: signedAbs(r0.quantity, true), value: signedAbs(r0.value, true),
+      net_amount: signedAbs(r0.net_amount, true), vat_amount: signedAbs(r0.vat_amount, true),
+      total_amount: signedAbs(r0.total_amount, true),
+    } : r0;
     const key = r.doc_date.slice(0, 7); // 'YYYY-MM'
     if (!months.has(key)) {
       months.set(key, { key, invoiceIds: new Set(), netTotal: 0, vatTotal: 0, grandTotal: 0, qtyByUnit: new Map(), valueByUnit: new Map(), pricedQtyByUnit: new Map(), unpricedLines: 0, valueTotal: 0 });
@@ -160,7 +182,7 @@ function computeMonthlyReport(rows) {
   }
 
   const list = Array.from(months.values()).sort((a, b) => b.key.localeCompare(a.key));
-  return { lineLevel, qtyMeaningful, months: list };
+  return { lineLevel, qtyMeaningful, months: list, creditCount: creditIds.size };
 }
 
 // π.χ. Map{'L'=>150, 'kg'=>20} -> "150,00 L, 20,00 kg" — ξεχωριστό άθροισμα ανά μονάδα.
@@ -185,7 +207,7 @@ function fmtAvgPriceByUnit(qtyMap, valueMap, unpricedLines = 0) {
 }
 
 function renderMonthlyReport(rows) {
-  const { lineLevel, qtyMeaningful, months } = computeMonthlyReport(rows);
+  const { lineLevel, qtyMeaningful, months, creditCount } = computeMonthlyReport(rows);
   const table = document.getElementById('reports-table');
   const body = document.getElementById('reports-body');
   const scopeNote = document.getElementById('reports-scope-note');
@@ -196,6 +218,8 @@ function renderMonthlyReport(rows) {
     : qtyMeaningful
       ? 'Ποσότητα/αξία/μέση τιμή ανά γραμμή (όχι τα ποσά τιμολογίου, αφορούν ολόκληρο το παραστατικό) — ενεργό φίλτρο περιγραφής'
       : 'Αξία ανά γραμμή, χωρίς ποσότητα (όχι τα ποσά τιμολογίου, αφορούν ολόκληρο το παραστατικό) — η ποσότητα δεν αθροίζεται χωρίς ενεργό φίλτρο περιγραφής, αφού κατηγορία/μηχάνημα από μόνα τους μπορεί να καλύπτουν εντελώς διαφορετικά προϊόντα';
+
+  if (creditCount) scopeNote.textContent += ` — τα ${creditCount} πιστωτικά αφαιρούνται από τα σύνολα`;
 
   table.querySelector('thead').innerHTML = !lineLevel
     ? `<tr><th>Μήνας</th><th class="text-right">Τιμολόγια</th><th class="text-right">Καθαρή Αξία</th><th class="text-right">ΦΠΑ</th><th class="text-right">Σύνολο</th></tr>`
@@ -324,8 +348,8 @@ function renderFuelRows(rows) {
       <td>${escapeHtml(r.supplier_name || '—')}</td>
       <td class="mono">${escapeHtml(r.doc_number || '—')}</td>
       <td>${escapeHtml(r.description || '—')}</td>
-      <td class="mono text-right">${r.quantity != null ? fmtQty(r.quantity) : '—'}</td>
-      <td class="mono text-right">${fmtMoney(r.total_amount)}</td>
+      <td class="mono text-right">${r.quantity != null ? fmtQty(signedAbs(r.quantity, isCreditNote(r))) : '—'}</td>
+      <td class="mono text-right">${fmtMoney(signedAbs(r.total_amount, isCreditNote(r)))}</td>
       <td>${r.efk_eligible ? '✓' : '—'}</td>
       <td>${r.pdf_available ? `<button class="btn btn-outline btn-sm" data-open-pdf="${escapeHtml(r.source_pdf_filename)}" title="Άνοιγμα PDF">📄</button>` : ''}</td>
     </tr>
