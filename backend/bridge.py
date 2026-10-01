@@ -269,6 +269,9 @@ def handle(cmd, payload):
         )
 
     # ── ΕΚΡΗΚΤΙΚΑ → expvault ─────────────────────────────────────────────────
+    if cmd == 'expvault_import_receipt_load':
+        return expvault_export.load_receipt(database, payload['file_path'])
+
     if cmd == 'expvault_export_preview':
         return expvault_export.preview(database, payload.get('date_from'), payload.get('date_to'))
 

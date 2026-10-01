@@ -147,7 +147,7 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'list_invoice_items_by_category', 'get_flagged_invoices', 'get_invoice_status_summary',
   'review_flagged_invoice', 'unreview_flagged_invoice',
   'add_invoice_from_data', 'update_invoice_from_data', 'delete_invoice_item', 'split_invoice_item',
-  'expvault_export_preview', 'expvault_export_write',
+  'expvault_export_preview', 'expvault_export_write', 'expvault_import_receipt_load',
   'generate_efk_report',
   'get_backup_config', 'run_backup', 'save_backup_config', 'set_backup_enabled',
   'list_backups', 'restore_backup', 'list_pdf_archives', 'run_pdf_archive_now',

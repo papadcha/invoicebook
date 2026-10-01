@@ -22,7 +22,7 @@ _local_db_dir = os.path.dirname(os.path.abspath(__file__ + '/../database'))
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database', 'schema.sql')
 MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database')
 
-CURRENT_SCHEMA_VERSION = 7
+CURRENT_SCHEMA_VERSION = 8
 
 migration_files = {
     1: os.path.join(MIGRATIONS_DIR, 'migration_001_initial_schema.sql'),
@@ -32,6 +32,7 @@ migration_files = {
     5: os.path.join(MIGRATIONS_DIR, 'migration_005_pdf_hashes.sql'),
     6: os.path.join(MIGRATIONS_DIR, 'migration_006_invoice_exports.sql'),
     7: os.path.join(MIGRATIONS_DIR, 'migration_007_invoice_ref_docs.sql'),
+    8: os.path.join(MIGRATIONS_DIR, 'migration_008_export_receipts.sql'),
 }
 
 
@@ -1072,30 +1073,75 @@ def merge_units(from_unit, to_unit):
 
 # ── ΙΣΤΟΡΙΚΟ ΕΞΑΓΩΓΩΝ προς εξωτερικά συστήματα (γενικό, target = σύστημα) ──────
 
-def record_invoice_exports(target, invoice_ids, file_name=None):
+def record_invoice_exports(target, invoice_ids, file_name=None, export_id=None, lines_by_invoice=None):
+    """Καταγράφει μια εξαγωγή. export_id = αναγνωριστικό της εξαγωγής (γράφεται και στο αρχείο), lines_by_invoice =
+    {invoice_id: [{'onoma','posotita'}]} — τι ακριβώς εξήχθη, για σύγκριση με το αποδεικτικό εισαγωγής."""
     now = _now()
+    lines_by_invoice = lines_by_invoice or {}
     with get_db() as conn:
         conn.executemany(
-            'INSERT INTO tbl_invoice_exports (invoice_id, target, exported_at, file_name) VALUES (?, ?, ?, ?)',
-            [(int(i), target, now, file_name) for i in invoice_ids]
+            'INSERT INTO tbl_invoice_exports (invoice_id, target, exported_at, file_name, export_id, lines_json) '
+            'VALUES (?, ?, ?, ?, ?, ?)',
+            [(int(i), target, now, file_name, export_id,
+              json.dumps(lines_by_invoice[i], ensure_ascii=False) if i in lines_by_invoice else None)
+             for i in invoice_ids]
         )
     return now
 
 
 def get_invoice_exports(target):
-    """{invoice_id: {'exported_at', 'file_name', 'count'}} -- η ΤΕΛΕΥΤΑΙΑ εξαγωγή κάθε
-    τιμολογίου προς το target, και πόσες φορές έχει εξαχθεί συνολικά."""
+    """{invoice_id: {...}} -- η ΤΕΛΕΥΤΑΙΑ εξαγωγή κάθε τιμολογίου προς το target (exported_at, file_name, export_id,
+    import_status/imported_at/import_note/receipt_file του αποδεικτικού εισαγωγής) και πόσες φορές έχει εξαχθεί."""
     with get_db() as conn:
         rows = conn.execute(
-            '''SELECT invoice_id, exported_at, file_name FROM tbl_invoice_exports
-               WHERE target=? ORDER BY exported_at, id''', (target,)
+            '''SELECT invoice_id, exported_at, file_name, export_id, import_status, imported_at, import_note, receipt_file
+               FROM tbl_invoice_exports WHERE target=? ORDER BY exported_at, id''', (target,)
         ).fetchall()
     out = {}
     for r in rows:
         prev = out.get(r['invoice_id'], {'count': 0})
-        out[r['invoice_id']] = {'exported_at': r['exported_at'], 'file_name': r['file_name'],
-                                'count': prev['count'] + 1}
+        out[r['invoice_id']] = {
+            'exported_at': r['exported_at'], 'file_name': r['file_name'], 'count': prev['count'] + 1,
+            'export_id': r['export_id'], 'import_status': r['import_status'], 'imported_at': r['imported_at'],
+            'import_note': r['import_note'], 'receipt_file': r['receipt_file'],
+        }
     return out
+
+
+def get_export_rows(export_id):
+    """Οι γραμμές ιστορικού μιας εξαγωγής (μία ανά τιμολόγιο) — για τη σύγκριση με το αποδεικτικό εισαγωγής."""
+    with get_db() as conn:
+        return [dict(r) for r in conn.execute(
+            'SELECT id, invoice_id, target, lines_json FROM tbl_invoice_exports WHERE export_id=?', (export_id,)
+        ).fetchall()]
+
+
+def set_export_import_status(row_id, status, imported_at, note, receipt_file):
+    with get_db() as conn:
+        conn.execute(
+            'UPDATE tbl_invoice_exports SET import_status=?, imported_at=?, import_note=?, receipt_file=? WHERE id=?',
+            (status, imported_at, note, receipt_file, row_id)
+        )
+
+
+def mark_exports_imported(target, invoice_ids, note):
+    """Χειροκίνητη επιβεβαίωση εισαγωγής για την ΤΕΛΕΥΤΑΙΑ εξαγωγή κάθε τιμολογίου (π.χ. εξαγωγές που έγιναν πριν υπάρξει
+    αποδεικτικό και ελέγχθηκαν με άλλον τρόπο). Γράφει import_status='ok' και το σχόλιο. Επιστρέφει πόσα σημειώθηκαν."""
+    n = 0
+    now = _now()
+    with get_db() as conn:
+        for inv in invoice_ids:
+            row = conn.execute(
+                'SELECT id FROM tbl_invoice_exports WHERE target=? AND invoice_id=? ORDER BY exported_at DESC, id DESC LIMIT 1',
+                (target, int(inv))
+            ).fetchone()
+            if row:
+                conn.execute(
+                    "UPDATE tbl_invoice_exports SET import_status='ok', imported_at=?, import_note=?, receipt_file=NULL WHERE id=?",
+                    (now, note, row['id'])
+                )
+                n += 1
+    return n
 
 
 # ── ΑΡΧΕΙΑ PDF: ορφανά / χαμένα / ίδιο PDF σε πολλά τιμολόγια (Layer 1 dedup) ──

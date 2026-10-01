@@ -2,6 +2,17 @@ import { escapeHtml, fmtDate, fmtDateTime, fmtQty, _lock } from '../../../js/uti
 
 let xvDocs = [];
 
+// Κατάσταση εισαγωγής στο ExpVault+ (αποδεικτικό εισαγωγής): ✓ ok / ⚠ διαφορές / ⏳ εκκρεμεί επιβεβαίωση.
+function importBadge(e) {
+  if (e.import_status === 'ok') {
+    return `<div style="color:var(--success);font-weight:600;" title="${escapeHtml(e.receipt_file || 'χειροκίνητη επιβεβαίωση')}">✓ Εισήχθη στο ExpVault+${e.imported_at ? ' ' + escapeHtml(fmtDateTime(e.imported_at)) : ''}${e.import_note ? ' — ' + escapeHtml(e.import_note) : ''}</div>`;
+  }
+  if (e.import_status === 'mismatch') {
+    return `<div style="color:var(--warn, #b45309);font-weight:600;">⚠ Εισήχθη με διαφορές: ${escapeHtml(e.import_note || '')}</div>`;
+  }
+  return '<div style="color:var(--muted);">⏳ Δεν έχει επιβεβαιωθεί η εισαγωγή στο ExpVault+ (φόρτωσε απόδειξη)</div>';
+}
+
 async function loadExpvaultPreview() {
   const container = document.getElementById('xv-preview');
   container.innerHTML = '<p class="muted-sm">Φόρτωση…</p>';
@@ -33,7 +44,7 @@ async function loadExpvaultPreview() {
           </td>
           <td class="muted-sm">${d.grammes.map(g => `${escapeHtml(g.onoma)} — ${fmtQty(g.posotita)} ${escapeHtml(g.monada)}`).join('<br>')}
             ${d.excluded.length ? `<br><i>Εξαιρούνται: ${d.excluded.map(x => `${escapeHtml(x.description)} (${escapeHtml(x.reason)})`).join(', ')}</i>` : ''}</td>
-          <td class="muted-sm">${d.exported ? `<div style="color:var(--success);font-weight:600;" title="${escapeHtml(d.exported.file_name || '')}">✓ Εξήχθη ${escapeHtml(fmtDateTime(d.exported.exported_at))}${d.exported.count > 1 ? ` (${d.exported.count} φορές)` : ''}</div>` : ''}
+          <td class="muted-sm">${d.exported ? `<div style="color:var(--success);font-weight:600;" title="${escapeHtml(d.exported.file_name || '')}">✓ Εξήχθη ${escapeHtml(fmtDateTime(d.exported.exported_at))}${d.exported.count > 1 ? ` (${d.exported.count} φορές)` : ''}</div>${importBadge(d.exported)}` : ''}
             ${d.adeia ? `Άδεια ${escapeHtml(d.adeia)}, ${escapeHtml(d.ekdousa_archi)}` : ''}
             ${d.warnings.map(w => `<div>⚠ ${escapeHtml(w)}</div>`).join('')}</td>
           <td class="row-actions">
@@ -98,3 +109,24 @@ async function loadExpvaultPreview() {
 }
 
 document.getElementById('xv-preview-btn').addEventListener('click', loadExpvaultPreview);
+
+// Φόρτωση αποδεικτικού εισαγωγής που βγάζει το ExpVault+ («🧾 Απόδειξη εισαγωγής») — σύγκριση ανά τιμολόγιο.
+document.getElementById('xv-receipt-btn').addEventListener('click', async () => {
+  const path = await window.api.openImportFile();   // διαλέγει JSON/CSV
+  if (!path) return;
+  const unlock = _lock(document.getElementById('xv-receipt-btn'));
+  try {
+    const r = await pyCallStrict('expvault_import_receipt_load', { file_path: path });
+    const parts = [`✓ ${r.ok} εισήχθησαν`];
+    if (r.mismatch) parts.push(`⚠ ${r.mismatch} με διαφορές`);
+    if (r.pending) parts.push(`⏳ ${r.pending} εκκρεμούν`);
+    if (r.unknown_exports.length) parts.push(`${r.unknown_exports.length} άγνωστα export_id`);
+    if (r.unknown_documents) parts.push(`${r.unknown_documents} άγνωστα παραστατικά`);
+    App.toast('Απόδειξη εισαγωγής: ' + parts.join(' · '), r.mismatch || r.unknown_exports.length ? 'warn' : 'ok');
+    if (document.getElementById('xv-preview').innerHTML.trim()) loadExpvaultPreview();
+  } catch (e) {
+    App.toast(e.message, 'fail');
+  } finally {
+    unlock();
+  }
+});

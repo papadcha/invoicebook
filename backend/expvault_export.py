@@ -22,8 +22,10 @@ import os
 import json
 import re
 import unicodedata
+import uuid
+from datetime import datetime
 
-from expvault_materials import canonical_material
+from expvault_materials import canonical_material, material_key
 
 CATEGORY = 'Εκρηκτικά'
 TARGET = 'expvault'
@@ -224,19 +226,109 @@ def _build_pairs(docs, tipos_overrides=None, exclude_ids=None):
     return out
 
 
+def new_export_id():
+    """Μοναδικό αναγνωριστικό εξαγωγής — γράφεται σε κάθε παραστατικό του αρχείου και στο ιστορικό, ώστε το
+    αποδεικτικό εισαγωγής του ExpVault+ να ταιριάξει με τη συγκεκριμένη εξαγωγή."""
+    return 'EX-' + datetime.now().strftime('%Y%m%d%H%M%S') + '-' + uuid.uuid4().hex[:6]
+
+
 def export_to_file(db, path, date_from=None, date_to=None, tipos_overrides=None, exclude_ids=None):
     """Ξαναϋπολογίζει το preview στο backend (πηγή αλήθειας η βάση, όχι ό,τι κράτησε το UI)
-    και γράφει το αρχείο."""
+    και γράφει το αρχείο. Κάθε παραστατικό παίρνει `export_id` (κοινό για όλη την εξαγωγή) και
+    `source_invoice_id` (το id του τιμολογίου), που το ExpVault+ κρατά και επιστρέφει στο αποδεικτικό εισαγωγής."""
     pairs = _build_pairs(preview(db, date_from, date_to), tipos_overrides, exclude_ids)
     if not pairs:
         raise ValueError('Δεν υπάρχει κανένα παραστατικό προς εξαγωγή')
+    eid = new_export_id()
+    lines_by_invoice = {}
+    for inv_id, obj in pairs:
+        obj['export_id'] = eid
+        obj['source_invoice_id'] = inv_id
+        lines_by_invoice[inv_id] = [{'onoma': g['onoma'], 'posotita': g['posotita']} for g in obj['grammes']]
     objs = [obj for _, obj in pairs]
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(objs, f, ensure_ascii=False, indent=2)
     # Καταγραφή ΜΟΝΟ αφού γραφτεί επιτυχώς το αρχείο.
-    db.record_invoice_exports(TARGET, [i for i, _ in pairs], os.path.basename(path))
+    db.record_invoice_exports(TARGET, [i for i, _ in pairs], os.path.basename(path),
+                              export_id=eid, lines_by_invoice=lines_by_invoice)
     return {
         'path': path, 'documents': len(objs), 'lines': sum(len(o['grammes']) for o in objs),
         'eisagoges': sum(o['tipos'] == 'ΕΙΣΑΓΩΓΗ' for o in objs),
         'epistrofes': sum(o['tipos'] == 'ΕΠΙΣΤΡΟΦΗ' for o in objs),
+        'export_id': eid,
     }
+
+
+# ── ΑΠΟΔΕΙΚΤΙΚΟ ΕΙΣΑΓΩΓΗΣ ────────────────────────────────────────────────────────
+def _lines_map(lines):
+    """{κλειδί υλικού: άθροισμα ποσότητας} — η σύγκριση αγνοεί σειρά, κεφαλαία/κενά/σημεία στίξης στο όνομα."""
+    out = {}
+    for l in lines:
+        k = material_key(l.get('onoma'))
+        out[k] = round(out.get(k, 0) + float(l.get('posotita') or 0), 3)
+    return out
+
+
+def _utc_iso(ts):
+    """'2026-10-01 14:30:00' (datetime('now') του ExpVault+, UTC) → ISO με ζώνη, όπως το _now() του invoicebook."""
+    if not ts:
+        return None
+    ts = str(ts).strip().replace(' ', 'T')
+    return ts if re.search(r'(Z|[+-]\d\d:\d\d)$', ts) else ts + '+00:00'
+
+
+def load_receipt(db, path):
+    """Φορτώνει αρχείο-απόδειξη εισαγωγής του ExpVault+ (format 'expvault-import-receipt') και, για κάθε εξαγωγή που
+    αναγνωρίζει (export_id), συγκρίνει ανά τιμολόγιο τις γραμμές που εξήχθησαν με αυτές που πράγματι καταχωρήθηκαν:
+    'ok' = ίδιες, 'mismatch' = διαφορές (καταγράφονται στο import_note). Τιμολόγια που δεν υπάρχουν στην απόδειξη μένουν
+    «εκκρεμεί». Ξαναφόρτωση της ίδιας ή νεότερης απόδειξης ξαναϋπολογίζει (idempotent)."""
+    with open(path, 'r', encoding='utf-8-sig') as f:
+        try:
+            data = json.load(f)
+        except json.JSONDecodeError as ex:
+            raise ValueError(f'Μη έγκυρο JSON: {ex}')
+    if not isinstance(data, dict) or data.get('format') != 'expvault-import-receipt':
+        raise ValueError('Το αρχείο δεν είναι απόδειξη εισαγωγής του ExpVault+ (λάθος «format»).')
+    if data.get('version') != 1:
+        raise ValueError(f'Μη υποστηριζόμενη έκδοση απόδειξης: {data.get("version")!r}')
+    name = os.path.basename(path)
+    summary = {'ok': 0, 'mismatch': 0, 'pending': 0, 'unknown_exports': [], 'unknown_documents': 0, 'details': []}
+    for ex in data.get('exports') or []:
+        eid = ex.get('export_id')
+        rows = db.get_export_rows(eid) if eid else []
+        if not rows:
+            summary['unknown_exports'].append(eid)
+            continue
+        docs_by_src = {}
+        for doc in ex.get('documents') or []:
+            docs_by_src.setdefault(str(doc.get('source_invoice_id')), []).append(doc)
+        known = {str(r['invoice_id']) for r in rows}
+        summary['unknown_documents'] += len([s for s in docs_by_src if s not in known])
+        for row in rows:
+            docs = docs_by_src.get(str(row['invoice_id']))
+            if not docs:
+                summary['pending'] += 1
+                continue
+            got = _lines_map([l for d in docs for l in d.get('lines') or []])
+            imported_at = _utc_iso(min((d.get('imported_at') or '') for d in docs) or None)
+            if row['lines_json']:
+                exp_lines = json.loads(row['lines_json'])
+                exp = _lines_map(exp_lines)
+                if exp == got:
+                    status, note = 'ok', None
+                else:
+                    names = {material_key(l.get('onoma')): l.get('onoma') for l in exp_lines}
+                    names.update({material_key(l.get('onoma')): l.get('onoma')
+                                  for d_ in docs for l in d_.get('lines') or [] if material_key(l.get('onoma')) not in names})
+                    parts = []
+                    for k in sorted(set(exp) | set(got)):
+                        if exp.get(k) != got.get(k):
+                            parts.append(f"{names.get(k, k)}: εξήχθη {exp.get(k, '—')} / καταχωρήθηκε {got.get(k, '—')}")
+                    status, note = 'mismatch', '; '.join(parts)[:500]
+            else:
+                status, note = 'ok', 'Χωρίς καταγεγραμμένες γραμμές εξαγωγής — επιβεβαιώθηκε μόνο η ύπαρξη του παραστατικού'
+            db.set_export_import_status(row['id'], status, imported_at, note, name)
+            summary[status] += 1
+            if status == 'mismatch':
+                summary['details'].append({'invoice_id': row['invoice_id'], 'note': note})
+    return summary

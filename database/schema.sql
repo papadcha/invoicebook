@@ -134,9 +134,16 @@ CREATE TABLE tbl_invoice_exports (
   invoice_id INTEGER NOT NULL REFERENCES tbl_invoices(id) ON DELETE CASCADE,
   target TEXT NOT NULL,
   exported_at TEXT NOT NULL,
-  file_name TEXT
+  file_name TEXT,
+  export_id TEXT,        -- αναγνωριστικό της εξαγωγής (βλ. migration 008)
+  lines_json TEXT,       -- τι εξήχθη (γραμμές) για σύγκριση με την απόδειξη
+  imported_at TEXT,
+  import_status TEXT,    -- NULL=εκκρεμεί, 'ok', 'mismatch'
+  import_note TEXT,
+  receipt_file TEXT
 );
 CREATE INDEX idx_invoice_exports_target ON tbl_invoice_exports(target, invoice_id);
+CREATE INDEX idx_invoice_exports_export_id ON tbl_invoice_exports(export_id);
 
 CREATE TABLE tbl_schema_version (
   version INTEGER NOT NULL,
