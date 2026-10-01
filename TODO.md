@@ -26,11 +26,8 @@
       backup) — το πού θα ζει παραμένει ρητά ανοιχτή απόφαση (στόχος: παντού μέσω presence)· εν τω μεταξύ χειροκίνητο αντίγραφο του
       `AppData\Roaming\expvaultplus\expvault.db`.
 
-- [ ] **ExpVault+ (v2) — τι μένει μετά την 2.0.1** (η 2.0.1 χτίστηκε και **εγκαταστάθηκε στο coding PC 2026-10-01, «έτρεξαν όλα ΟΚ»** — βλ. DONE.md· η βάση με τα 359 στοιχεία ζει ΜΟΝΟ σε αυτό το PC,
-      χωρίς ρυθμισμένο backup της εφαρμογής· υπάρχουν όμως 2 χειροκίνητα αντίγραφα: Desktop `expvaultplus_backup_20261001_215437.db` και `pcloud:expvaultplus-backup/`): (α) **μόνιμο backup/presence** —
-      **το πού «ζει» το expvault παραμένει ρητά ανοιχτή απόφαση** (στόχος: διαθέσιμο παντού όπου μπορεί, γι' αυτό υπάρχει το presence)· (β) **δημοσίευση 2.0.1 σε ΑΛΛΑ μηχανήματα** (π.χ. χειριστής/data-entry PC):
-      GitHub release `expvaultplus-v2.0.1` (ο installer που φτιάχνει το build λέγεται `ExpVault+ Setup 2.0.1.exe`, ενώ το release 2.0.0 είχε asset `expvaultplus-setup-2.0.0.exe` — μετονομασία) + ενημέρωση
-      `allowed-versions-v2.json` (κλάδος `v2`: `latestRecommendedVersion`, ίσως `safeDowngradeFloor`) — **εξωτερική ενέργεια, μόνο με ρητό ΟΚ**· (γ) **πρώτος ΠΡΑΓΜΑΤΙΚΟΣ γύρος αποδεικτικού εισαγωγής**:
+- [ ] **ExpVault+ (v2) — τι μένει μετά την 2.0.1** (η 2.0.1 χτίστηκε, **εγκαταστάθηκε στο coding PC 2026-10-01** και **δημοσιεύτηκε** ως pre-release `expvaultplus-v2.0.1` + `allowed-versions-v2.json` — βλ. DONE.md· η βάση με τα 359 στοιχεία ζει ΜΟΝΟ σε αυτό το PC):
+      (α) **μόνιμο backup/presence** — ρυθμισμένο: `backup_config.json` paths = `Z:/Projects/ExpVaultPlus/backup` (NAS) + `pcloud:expvaultplus-backup`, max_keep 30, τρέχει στο κλείσιμο της εφαρμογής· **το pCloud δοκιμάστηκε ΟΚ, το NAS ΟΧΙ (Z: offline) — να επαληθευτεί όταν συνδεθεί**· presence ενεργό μέσω pCloud· **το πού «ζει» το expvault παραμένει ρητά ανοιχτή απόφαση**· (β) **εγκατάσταση 2.0.1 στα ΑΛΛΑ μηχανήματα** (data-entry PC): θα εμφανιστεί αυτόματα banner ενημέρωσης από το manifest· (γ) **πρώτος ΠΡΑΓΜΑΤΙΚΟΣ γύρος αποδεικτικού εισαγωγής**:
       το αποδεικτικό δοκιμάστηκε μόνο σε αντίγραφα βάσεων — να τρέξει ζωντανά στην επόμενη εισαγωγή (νέο export → εισαγωγή στο ExpVault+ → «🧾 Απόδειξη εισαγωγής» → «📥 Φόρτωση» στο invoicebook)· τα κουμπιά
       του UI δεν έχουν δοκιμαστεί στην πράξη· (δ) δεδομένα αδειών (ημερομηνίες λήξης, όρια υλικών ανά άδεια — καταχώρηση, όχι κώδικας)· (ε) ο κλάδος `backup/local-fixes-2026-07-10` (2 διορθώσεις της 10/7:
       migrations, escaping/update-checker) στάλθηκε στο GitHub αλλά **δεν έχει εξεταστεί αν χρειάζεται στο `v2`**· (στ) το `github-token.json` (fine-grained PAT, Issues: R/W μόνο στο `papadcha/expvault`, για το

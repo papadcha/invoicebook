@@ -4,6 +4,10 @@
 `TODO.md` για ό,τι μένει. Ζει μόνο στο invoicebook repo (τα intake-tool/report-tool
 αποσύρθηκαν 2026-09-26/2026-09-30 και δεν συγχρονίζονται πια μαζί του).
 
+## [expvault/ExpVault+] Δημοσίευση 2.0.1 + μόνιμο backup/presence (2026-10-01)
+
+GitHub pre-release `expvaultplus-v2.0.1` (target 9536ac4, asset `expvaultplus-setup-2.0.1.exe`, 156.666.381 bytes, sha512 ελέγχθηκε με το `latest.yml`, το download URL απαντά 200). `allowed-versions-v2.json` στον κλάδο `v2` (commit f21bc37): `latestRecommendedVersion` 2.0.1, `safeDowngradeFloor` μένει 2.0.0 (τα migrations είναι προσθετικά). Backup: `backup_config.json` με NAS + pCloud, max_keep 30· δοκιμαστικό backup στο pCloud πέτυχε, το NAS απέτυχε επειδή το Z: ήταν offline. Presence heartbeat/list_presence δούλεψαν μέσω pCloud.
+
 ## [expvault/ExpVault+] Έκδοση 2.0.1: build, εγκατάσταση στο coding PC, αντίγραφα ασφαλείας (2026-10-01)
 
 Περιεχόμενο της 2.0.1 (κλάδος `v2`, repo `C:/expvault`): fix allowlist Δελτίου Δραστηριότητας (521ec58), κανονικοποίηση ids υλικών/`export_group` στο export βιβλίου (ad01521), αποδεικτικό εισαγωγής (837ecad), και
