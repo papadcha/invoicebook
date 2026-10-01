@@ -4,6 +4,29 @@
 `TODO.md` για ό,τι μένει. Ζει μόνο στο invoicebook repo (τα intake-tool/report-tool
 αποσύρθηκαν 2026-09-26/2026-09-30 και δεν συγχρονίζονται πια μαζί του).
 
+## [expvault/ExpVault+] Έκδοση 2.0.1: build, εγκατάσταση στο coding PC, αντίγραφα ασφαλείας (2026-10-01)
+
+Περιεχόμενο της 2.0.1 (κλάδος `v2`, repo `C:/expvault`): fix allowlist Δελτίου Δραστηριότητας (521ec58), κανονικοποίηση ids υλικών/`export_group` στο export βιβλίου (ad01521), αποδεικτικό εισαγωγής (837ecad), και
+ενημέρωση ενσωματωμένων (9536ac4): `pypdf==6.19.0` στο `requirements.txt` (έλειπε), reportlab 5.0.1, PyInstaller 6.22.3 (hooks 2026.8), Electron 43.2.0→43.7.7, ενσωματωμένο rclone 1.74.4→1.75.1 (SHA-256 ελέγχθηκε με
+το `SHA256SUMS` του rclone.org). **Build** με `build.ps1` (5 βήματα: pip, PyInstaller, smoke test, npm, electron-builder με `--publish never` — τίποτα δεν ανέβηκε): **smoke test πέρασε**, installer
+`dist/ExpVault+ Setup 2.0.1.exe` (149,4 MB). Επιπλέον έλεγχος: το πακεταρισμένο `bridge.exe` διαβάζει PDF NITROCHEM (`parse_pdf`: ΔΙΧΝ 19858, 10 γραμμές) — επιβεβαιώνει ότι το pypdf μπήκε· ο parser του invoicebook
+δουλεύει κανονικά με το νέο pypdf (8 αρχεία, 67 γραμμές, 0 προειδοποιήσεις). **Πριν την εγκατάσταση** πάρθηκαν αντίγραφα της βάσης ExpVault+ (SQLite backup API, integrity ok, 359 κινήσεις): Desktop και
+`pcloud:expvaultplus-backup/expvaultplus_backup_20261001_215437.db` (νέος φάκελος, χωριστός από `invoicebook-backup`· επαληθεύτηκε με `rclone check`). **Μετά την εγκατάσταση** (χρήστης: «έτρεξαν όλα ΟΚ»): έκδοση
+2.0.1 εγκατεστημένη, `integrity_check` ok, 359 κινήσεις, migrations εφαρμόστηκαν (στήλες `export_id`/`source_ref`, `export_group` συμπληρωμένο σε 25/28 υλικά — τα 3 χωρίς ομάδα είναι ANFO/EM-EX/πυροκροτητές, όπως στο v1).
+Διευκρίνιση: το `github-token.json` (ενσωματωμένο στον installer) είναι fine-grained PAT για το «Αναφορά Προβλήματος», ΟΧΙ για το presence (που δουλεύει μέσω rclone).
+**Μένουν** (στο TODO): δημοσίευση release/`allowed-versions-v2.json` για άλλα μηχανήματα, ζωντανός γύρος αποδεικτικού, μόνιμο backup/presence, δεδομένα αδειών.
+
+### Το item όπως ήταν στο TODO.md πριν την ενημέρωση
+- [ ] **ExpVault+ (v2) — υποδομή** (η βάση με τα 359 στοιχεία του 2026 ζει προς το παρόν ΜΟΝΟ στο coding PC, χωρίς ρυθμισμένο backup):
+      (α) **χειροκίνητο αντίγραφο** του `expvault.db` του ExpVault+ τώρα (π.χ. στο NAS)· (β) μόνιμο backup/presence — **το πού «ζει» το
+      expvault παραμένει ρητά ανοιχτή απόφαση** (στόχος: διαθέσιμο παντού όπου μπορεί, γι' αυτό υπάρχει το presence)· (γ) **νέο build/εγκατάσταση**
+      του ExpVault+ αν χρησιμοποιείται το `.exe` — **χρειάζεται για να φτάσουν στην εφαρμογή και οι δύο διορθώσεις που είναι ήδη στο GitHub, κλάδος `v2`**: (i) `main.js`:
+      εντολές `export_deltio_drastiriotitas_excel/_pdf` (έλειπαν από το allowlist, commit 521ec58)· (ii) export βιβλίου: κανονικοποίηση ids υλικών και `export_group`
+      (commit ad01521)· (iii) **αποδεικτικό εισαγωγής** (κουμπί «🧾 Απόδειξη εισαγωγής» + στήλες `export_id`/`source_ref` στις κινήσεις) — **χωρίς το νέο build το invoicebook
+      δεν θα παίρνει απόδειξη και τα νέα exports θα μένουν «⏳ εκκρεμεί επιβεβαίωση»**. Οι migrations (`export_group`, στήλες αποδεικτικού) θα τρέξουν στη βάση του ExpVault+ μόλις ανοίξει με το νέο build. **Δεν έχει δοκιμαστεί σε build** ούτε οπτικά το PDF/Word· (δ) ο κλάδος `backup/local-fixes-2026-07-10` (2 διορθώσεις της 10/7: migrations,
+      escaping/update-checker) στάλθηκε στο GitHub αλλά **δεν έχει εξεταστεί αν χρειάζεται στο `v2`**.
+
+
 ## [invoicebook/expvault] Αποδεικτικό εισαγωγής: το invoicebook ξέρει αν ένα export ΜΠΗΚΕ πράγματι στο ExpVault+ (2026-10-01)
 
 Πρόβλημα: το «✓ Εξήχθη» σήμαινε μόνο ότι γράφτηκε αρχείο· ένα αρχείο που δεν είχε εισαχθεί (π.χ. το `ΔΕ 10`) φαινόταν εξαγμένο. **Επιλογή χρήστη**: αρχείο-απόδειξη που βγάζει το ExpVault+
