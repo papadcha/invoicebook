@@ -23,10 +23,17 @@ import json
 import re
 import unicodedata
 
+from expvault_materials import canonical_material
+
 CATEGORY = 'Εκρηκτικά'
 TARGET = 'expvault'
 TIPOI = ('ΕΙΣΑΓΩΓΗ', 'ΕΠΙΣΤΡΟΦΗ')
 FYLAXI_NOTE = {'ΕΙΣΑΓΩΓΗ': 'ΑΠΟ ΦΥΛΑΞΗ', 'ΕΠΙΣΤΡΟΦΗ': 'ΠΡΟΣ ΦΥΛΑΞΗ'}
+
+# ΑΦΜ προμηθευτή (invoicebook) → όνομα προμηθευτή όπως το ξέρει ήδη το expvault (εκεί είναι
+# απλή ετικέτα, χωρίς ΑΦΜ). NITROCHEM: Ε.Π.Ε. → Α.Ε. στις 08/09/2017, ίδιο ΑΦΜ — στο invoicebook
+# μένει «Ε.Π.Ε.» (ιστορικό όνομα), στο expvault «Α.Ε.» (αλλιώς διπλός προμηθευτής).
+_EXPVAULT_SUPPLIER_NAMES = {'800385641': 'NITROCHEM Α.Ε.'}
 
 # Γραμμές που δεν είναι πραγματικό υλικό (ίδιο μοτίβο με το Λιπαντικά cleanup).
 _NON_MATERIAL = re.compile(r'ΜΕΤΑΦΟΡ|ΚΟΜΙΣΤΡ|ΕΙΣΦΟΡ|ΑΝΑΚΥΚΛ|ΕΞΟΔ|ΕΚΠΤΩΣ|Φ\.?Π\.?Α')
@@ -69,6 +76,45 @@ def _propose_tipos(doc_type, notes):
     return 'ΕΙΣΑΓΩΓΗ', '', False, 'Αγορά'
 
 
+def _vat_key(vat):
+    v = re.sub(r'\D', '', str(vat or ''))
+    return v or None
+
+
+def _export_identity(inv, tipos):
+    """(ημερομηνία, αριθμός, προμηθευτής, reason, warnings) που γράφονται στο expvault.
+
+    Τιμολόγια/πιστωτικά με «Σχετ. Παραστατικό» (migration 007): το νόμιμο βιβλίο δουλεύει με το
+    ΔΕΛΤΙΟ ΑΠΟΣΤΟΛΗΣ, όχι με το τιμολόγιο — ημερομηνία και αριθμός του Δ.Α. (εισαγωγή:
+    «ΔΙΧΝ 19858», 6/3· επιστροφή: ημερομηνία ΔΕΠ και δικό μας Δ.Α. «ΔΕ 9»). Προμηθευτής:
+    στις εισαγωγές αυτός του τιμολογίου (με το όνομα που ξέρει το expvault), στις επιστροφές ο
+    πελάτης όπως τυπώνεται (ο «προμηθευτής» είναι όποιος εξέδωσε το έντυπο — δικό μας Δ.Α.).
+    Χωρίς Σχετ. Παραστατικό (ιστορικά Δ.Α.) μένει η παλιά συμπεριφορά."""
+    if not inv['ref_doc_number']:
+        return inv['doc_date'], inv['doc_number'], inv['supplier_name'] or '', None, []
+    warnings = []
+    credit = tipos == 'ΕΠΙΣΤΡΟΦΗ'
+    date = inv['ref_doc_date']
+    if not date:
+        warnings.append('Χωρίς ημερομηνία Σχετ. Παραστατικού — χρησιμοποιείται η ημερομηνία του τιμολογίου')
+        date = inv['doc_date']
+    if credit:
+        number = inv['own_doc_number']
+        if not number:
+            warnings.append('Πιστωτικό χωρίς δικό μας Δ.Α. επιστροφής — χρησιμοποιείται το Σχετ. Παραστατικό')
+            number = inv['ref_doc_number']
+        who = inv['customer_name']
+        if not who:
+            warnings.append('Πιστωτικό χωρίς όνομα πελάτη — χρησιμοποιείται ο προμηθευτής του τιμολογίου')
+            who = inv['supplier_name'] or ''
+        reason = f'Πιστωτικό — επιστροφή με δικό μας Δ.Α. ({number}), ημερομηνία του {inv["ref_doc_number"]}'
+    else:
+        number = inv['ref_doc_number']
+        who = _EXPVAULT_SUPPLIER_NAMES.get(_vat_key(inv['vat_number']), inv['supplier_name'] or '')
+        reason = f'Τιμολόγιο — κίνηση με το Σχετ. Δ.Α. ({number})'
+    return date, number, who, reason, warnings
+
+
 def preview(db, date_from=None, date_to=None):
     """Ένα dict ανά τιμολόγιο που έχει τουλάχιστον μία γραμμή «Εκρηκτικά»."""
     target = _norm(CATEGORY)
@@ -80,7 +126,8 @@ def preview(db, date_from=None, date_to=None):
     with db.get_db() as conn:
         invoices = conn.execute(
             f'''SELECT i.id, i.doc_date, i.doc_type, i.doc_number, i.notes, i.source_pdf_filename,
-                       s.name AS supplier_name
+                       i.ref_doc_number, i.ref_doc_date, i.own_doc_number, i.customer_name,
+                       s.name AS supplier_name, s.vat_number
                 FROM tbl_invoices i LEFT JOIN tbl_suppliers s ON s.id = i.supplier_id
                 WHERE {' AND '.join(where)} ORDER BY i.doc_date, i.id''', params
         ).fetchall()
@@ -98,6 +145,9 @@ def preview(db, date_from=None, date_to=None):
         if not items:
             continue
         tipos, paratirishis, is_fylaxi, reason = _propose_tipos(inv['doc_type'], inv['notes'])
+        x_date, x_number, x_who, x_reason, id_warnings = _export_identity(inv, tipos)
+        if x_reason:
+            reason = x_reason
         m = _ADEIA_RE.search(inv['notes'] or '')
         grammes, excluded, warnings = [], [], []
         for it in items:
@@ -111,16 +161,23 @@ def preview(db, date_from=None, date_to=None):
             monada = _unit(it['unit'])
             if not monada:
                 warnings.append(f'Άγνωστη μονάδα «{it["unit"] or "—"}» στο «{desc}» — θα μπει ως Κιλ')
-            grammes.append({'onoma': desc, 'posotita': it['quantity'], 'monada': monada or 'Κιλ'})
+            # Το όνομα του expvault (ταίριασμα κατά κλειδί) — αλλιώς .upper() + προειδοποίηση,
+            # γιατί ένα άγνωστο όνομα θα έφτιαχνε ΝΕΟ υλικό στο expvault.
+            known = canonical_material(desc)
+            if not known:
+                warnings.append(f'Υλικό «{desc}» εκτός καταλόγου expvault — θα δημιουργηθεί νέο υλικό εκεί')
+            grammes.append({'onoma': known or desc.upper(), 'posotita': it['quantity'], 'monada': monada or 'Κιλ'})
         if not m:
             warnings.append('Δεν βρέθηκε «Άδεια: …, Εκδούσα αρχή: …» στις σημειώσεις')
-        if not inv['doc_number']:
+        warnings.extend(id_warnings)
+        if not x_number:
             warnings.append('Χωρίς αριθμό παραστατικού')
         if not grammes:
             warnings.append('Καμία γραμμή υλικού — δεν θα εξαχθεί')
         docs.append({
             'invoice_id': inv['id'], 'doc_date': inv['doc_date'], 'doc_type': inv['doc_type'],
             'doc_number': inv['doc_number'], 'supplier_name': inv['supplier_name'],
+            'export_date': x_date, 'export_number': x_number, 'export_promitheftis': x_who,
             'source_pdf_filename': inv['source_pdf_filename'],
             'tipos': tipos, 'paratirishis': paratirishis, 'is_fylaxi': is_fylaxi,
             'needs_check': is_fylaxi, 'reason': reason,
@@ -152,12 +209,12 @@ def _build_pairs(docs, tipos_overrides=None, exclude_ids=None):
         # Αλλαγή κατεύθυνσης σε έγγραφο φύλαξης αλλάζει και την παρατήρηση.
         paratirishis = FYLAXI_NOTE[tipos] if d['is_fylaxi'] else d['paratirishis']
         out.append((d['invoice_id'], {
-            'imerominia': d['doc_date'] or '',
+            'imerominia': d['export_date'] or '',
             'tipos': tipos,
-            'arithmos_parstatikou': d['doc_number'] or '',
+            'arithmos_parstatikou': d['export_number'] or '',
             'adeia': d['adeia'],
             'ekdousa_archi': d['ekdousa_archi'],
-            'promitheftis': d['supplier_name'] or '',
+            'promitheftis': d['export_promitheftis'] or '',
             'paratirishis': paratirishis,
             'agora_ref': '',
             'grammes': d['grammes'],

@@ -24,6 +24,8 @@ NITROCHEM Α.Ε. (πρότυπο EpsilonDigital, text layer — όχι σαρω�
 import os
 import re
 
+from expvault_materials import canonical_material
+
 try:
     import pypdf
 except ImportError:  # pragma: no cover — το requirements.txt το έχει
@@ -95,11 +97,17 @@ def parse_text(text, path=None):
             'quantity': _num(qty),
             'unit_price': _num(price),
             'value': _num(value),
-            'category': CATEGORY,
+            # Μόνο υλικά του καταλόγου του expvault μαρκάρονται «Εκρηκτικά» — ό,τι άλλο
+            # (π.χ. ΠΕΝΣΕΣ/CAP CRIMPER, εργαλείο) μένει χωρίς κατηγορία, να το ορίσει ο
+            # χειριστής στην προεπισκόπηση, αντί να μπει σιωπηλά στο νόμιμο βιβλίο.
+            'category': CATEGORY if canonical_material(desc) else None,
             'efk_eligible': False,
         })
     if not items:
         raise ValueError('Δεν βρέθηκε καμία γραμμή είδους στο PDF.')
+    foreign = [i['description'] for i in items if not i['category']]
+    if foreign:
+        warnings.append('Είδος εκτός καταλόγου expvault (δεν σημειώθηκε «Εκρηκτικά»): ' + '; '.join(foreign))
     unmatched = [l for l in lines if re.search(r'\d{6,9}\s', l) and re.search(r'(Κιλ|Τεμ|Μετρ)', l)
                  and not _ITEM_RE.match(l)]
     if unmatched:

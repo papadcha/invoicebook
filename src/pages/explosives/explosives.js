@@ -21,9 +21,10 @@ async function loadExpvaultPreview() {
       <tbody>${xvDocs.map((d, i) => `
         <tr>
           <td><input type="checkbox" class="xv-cb" data-i="${i}" ${!d.grammes.length ? 'disabled' : d.exported ? '' : 'checked'}></td>
-          <td>${escapeHtml(fmtDate(d.doc_date))}</td>
-          <td>${escapeHtml(d.supplier_name || '—')}</td>
-          <td>${escapeHtml(d.doc_number || '—')}</td>
+          <td>${escapeHtml(fmtDate(d.export_date || d.doc_date))}</td>
+          <td>${escapeHtml(d.export_promitheftis || d.supplier_name || '—')}</td>
+          <td>${escapeHtml(d.export_number || d.doc_number || '—')}
+            ${d.export_number && d.export_number !== d.doc_number ? `<div class="muted-sm" title="Το παραστατικό στο invoicebook">τιμ. ${escapeHtml(d.doc_number || '—')} · ${escapeHtml(fmtDate(d.doc_date))}</div>` : ''}</td>
           <td>
             <select class="xv-tipos" data-i="${i}">
               ${['ΕΙΣΑΓΩΓΗ', 'ΕΠΙΣΤΡΟΦΗ'].map(t => `<option ${t === d.tipos ? 'selected' : ''}>${t}</option>`).join('')}
