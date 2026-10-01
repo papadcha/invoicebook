@@ -4,6 +4,10 @@
 `TODO.md` για ό,τι μένει. Ζει μόνο στο invoicebook repo (τα intake-tool/report-tool
 αποσύρθηκαν 2026-09-26/2026-09-30 και δεν συγχρονίζονται πια μαζί του).
 
+## [expvault/ExpVault+] Έκδοση 2.0.2: διόρθωση presence, build, δημοσίευση (2026-10-01)
+
+Στο modal «Ιστορικό Εκδόσεων» η κάρτα και το πλαίσιο «Συνδεδεμένοι χρήστες» έβγαιναν κόκκινα ενώ ο χρήστης ήταν μόνος: στη `refreshPresenceList()` (`js/version-notice.js`) το δικό του φρέσκο heartbeat αναγνωριζόταν ως ήδη υπάρχον αλλά δεν σημαδευόταν `_isMe`, άρα μετρούσε ως «άλλος χρήστης». (Το sidebar badge είχε σωστή λογική και έμενε πράσινο. Η πρώτη υπόθεση, cache αποτυχίας του `whoami`, ήταν λάθος· η αλλαγή αυτή έμεινε ως ακίνδυνη βελτίωση.) Commit `3fdb951` (+ `91639d7` manifest) στον κλάδο `v2`. Build ΟΚ (smoke test πέρασε), installer `ExpVault+ Setup 2.0.2.exe` 149,4 MB. GitHub pre-release `expvaultplus-v2.0.2` (asset `expvaultplus-setup-2.0.2.exe`, 156.666.392 bytes, sha512 ίδιο με `latest.yml`), `allowed-versions-v2.json`: `latestRecommendedVersion` 2.0.2, `safeDowngradeFloor` 2.0.0. **Δεν έχει εγκατασταθεί/δοκιμαστεί ακόμα σε εφαρμογή.** Γνωστό ελάττωμα (στο TODO): το modal δεν δείχνει εκδόσεις 2.x, μόνο το δέντρο της 1.x.
+
 ## [expvault/ExpVault+] Δημοσίευση 2.0.1 + μόνιμο backup/presence (2026-10-01)
 
 GitHub pre-release `expvaultplus-v2.0.1` (target 9536ac4, asset `expvaultplus-setup-2.0.1.exe`, 156.666.381 bytes, sha512 ελέγχθηκε με το `latest.yml`, το download URL απαντά 200). `allowed-versions-v2.json` στον κλάδο `v2` (commit f21bc37): `latestRecommendedVersion` 2.0.1, `safeDowngradeFloor` μένει 2.0.0 (τα migrations είναι προσθετικά). Backup: `backup_config.json` με NAS + pCloud, max_keep 30· δοκιμαστικό backup στο pCloud πέτυχε, το NAS απέτυχε επειδή το Z: ήταν offline. Presence heartbeat/list_presence δούλεψαν μέσω pCloud.
