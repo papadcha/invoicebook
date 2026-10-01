@@ -955,6 +955,19 @@ _TO_GREEK_HOMOGLYPHS = str.maketrans({
 })
 
 
+# Γνωστές παραλλαγές του ίδιου τίτλου → κανονική μορφή (κλειδί: κεφαλαία χωρίς τόνους).
+# Προστίθενται ΜΟΝΟ επιβεβαιωμένα ίδια παραστατικά (2026-10-01: «ΔΕΛΤΙΟ ΑΠΟΣΤΟΛΗΣ» = «Δελτίο
+# Αποστολής»)· άγνωστη τιμή μένει όπως ήρθε, δεν γίνεται εικασία.
+_DOC_TYPE_ALIASES = {
+    'ΔΕΛΤΙΟ ΑΠΟΣΤΟΛΗΣ': 'Δελτίο Αποστολής',
+}
+
+
+def _doc_type_key(doc_type):
+    nfd = unicodedata.normalize('NFD', doc_type)
+    return ''.join(c for c in nfd if unicodedata.category(c) != 'Mn').upper()
+
+
 def canonical_doc_type(doc_type):
     """Καθαρίζει το doc_type: trim, μονά κενά και — μόνο σε λέξεις που περιέχουν ήδη ελληνικά
     γράμματα — αντικατάσταση όμοιων λατινικών/κυριλλικών με ελληνικά. Καθαρά λατινικό κείμενο
@@ -966,10 +979,11 @@ def canonical_doc_type(doc_type):
         return None
     # Ανά λέξη: διορθώνεται μόνο λέξη που ΜΙΞΕΙ ελληνικά με όμοια λατινικά/κυριλλικά — μια
     # ολόκληρη λατινική λέξη (π.χ. «POS») μένει ανέγγιχτη.
-    return ' '.join(
+    doc_type = ' '.join(
         w.translate(_TO_GREEK_HOMOGLYPHS) if re.search(r'[Α-Ωα-ωΆ-Ώά-ώ]', w) else w
         for w in doc_type.split(' ')
     )
+    return _DOC_TYPE_ALIASES.get(_doc_type_key(doc_type), doc_type)
 
 
 def _unit_script(unit):
