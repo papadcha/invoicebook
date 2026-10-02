@@ -32,6 +32,7 @@ import database
 import expvault_export
 import efk_report
 import nitrochem_pdf
+import delivery_notes
 import backup
 database.DB_NAME = DB_PATH
 database.PDF_STORE_DIR = os.path.join(os.path.dirname(DB_PATH), 'pdf_store')
@@ -153,6 +154,11 @@ def handle(cmd, payload):
     if cmd == 'parse_import_files':
         # Πολλά PDF NITROCHEM μαζί — ένα προβληματικό δεν ακυρώνει τα υπόλοιπα (rows + errors).
         return nitrochem_pdf.parse_pdfs(payload['file_paths'])
+
+    if cmd == 'attach_delivery_notes':
+        # Δελτία Αποστολής ΔΙΧΝ → πίσω από το PDF του τιμολογίου (apply=False: μόνο προεπισκόπηση)
+        return delivery_notes.attach_delivery_notes(
+            database, payload['file_paths'], apply=bool(payload.get('apply')))
 
     if cmd == 'stage_rows':
         return database.import_staging_rows(

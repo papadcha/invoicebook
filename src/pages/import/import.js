@@ -126,6 +126,39 @@ document.getElementById('pick-pdfs-btn').addEventListener('click', async () => {
   }
 });
 
+document.getElementById('attach-da-btn').addEventListener('click', async () => {
+  const paths = await window.api.openImportPdfs();
+  if (!paths || !paths.length) return;
+  const unlock = _lock(document.getElementById('attach-da-btn'));
+  try {
+    // Πρώτα προεπισκόπηση (τίποτα δεν αλλάζει), μετά επιβεβαίωση από τον χειριστή
+    const preview = await pyCallStrict('attach_delivery_notes', { file_paths: paths, apply: false });
+    const ready = preview.filter(r => r.status === 'ready');
+    const skipped = preview.filter(r => r.status !== 'ready');
+    const lines = [
+      ...ready.map(r => '✔ ' + r.message),
+      ...skipped.map(r => '✘ ' + r.file + ' — ' + r.message),
+    ];
+    if (!ready.length) {
+      App.toast('Κανένα δελτίο δεν μπορεί να ενωθεί:
+' + lines.join('
+'), 'fail');
+      return;
+    }
+    if (!window.confirm(`Ένωση ${ready.length} δελτίων αποστολής πίσω από τα τιμολόγια τους;
+
+` + lines.join('
+'))) return;
+    const done = await pyCallStrict('attach_delivery_notes', { file_paths: ready.map(r => paths.find(p => p.endsWith(r.file))), apply: true });
+    const ok = done.filter(r => r.status === 'applied').length;
+    App.toast(`Ενώθηκαν ${ok} δελτία αποστολής` + (skipped.length ? ` — ${skipped.length} δεν ενώθηκαν (δες την προηγούμενη λίστα)` : ''), ok === done.length ? 'ok' : 'warn');
+  } catch (e) {
+    App.toast(e.message, 'fail');
+  } finally {
+    unlock();
+  }
+});
+
 function qtyLabel(it) {
   if (it.quantity === null || it.quantity === undefined || it.quantity === '') return '—';
   return `${fmtQty(it.quantity)}${it.unit ? ' ' + it.unit : ''}`;

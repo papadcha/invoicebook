@@ -135,7 +135,7 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'get_orphan_suppliers', 'delete_orphan_suppliers', 'get_suppliers_with_invalid_vat',
   'get_invoice', 'delete_invoice', 'attach_pdf',
   'import_staging_file', 'get_staging_batch', 'update_staging_row', 'confirm_staging_row', 'reject_staging_row',
-  'parse_import_file', 'parse_import_files', 'stage_rows', 'list_categories', 'list_machines',
+  'parse_import_file', 'parse_import_files', 'attach_delivery_notes', 'stage_rows', 'list_categories', 'list_machines',
   'find_duplicate_invoice', 'merge_documents',
   'get_supplier_merge_candidates', 'get_supplier_merge_preview', 'merge_suppliers',
   'get_description_merge_candidates', 'merge_item_descriptions',
