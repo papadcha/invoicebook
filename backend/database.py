@@ -2282,7 +2282,7 @@ def get_flagged_invoices():
       αλλάζει κατηγορία σοβαρότητας."""
     with get_db() as conn:
         invoices = conn.execute('''
-            SELECT i.id, i.doc_number, i.doc_date, i.net_amount, i.vat_amount,
+            SELECT i.id, i.doc_number, i.doc_date, i.doc_type, i.net_amount, i.vat_amount,
                    i.total_amount, s.name as supplier_name
             FROM tbl_invoices i
             LEFT JOIN tbl_suppliers s ON s.id = i.supplier_id
@@ -2317,6 +2317,12 @@ def get_flagged_invoices():
         items = items_by_invoice.get(inv_id, [])
         severity = None
         reason = None
+        # Πιστωτικά: το πρόσημο είναι ασυνεπές στη βάση (νέα: αρνητική κεφαλίδα + θετικές
+        # γραμμές· παλιά: μικτά) — οι έλεγχοι αναντιστοιχίας συγκρίνουν απόλυτες τιμές,
+        # αλλιώς κάθε πιστωτικό βγαίνει «σοβαρό» (διαφορά = 2×ποσό).
+        is_credit = 'ΠΙΣΤΩΤΙΚ' in (inv['doc_type'] or '').upper()
+        if is_credit and net_amount is not None:
+            net_amount = abs(net_amount)
 
         if inv_id in duplicate_ids:
             severity = 'duplicate'
@@ -2342,6 +2348,8 @@ def get_flagged_invoices():
             diff = None
             if net_amount is not None:
                 item_sum = sum(it['value'] for it in items if it['value'] is not None)
+                if is_credit:
+                    item_sum = sum(abs(it['value']) for it in items if it['value'] is not None)
                 diff = abs(item_sum - net_amount)
 
             # Ίδια λογική με diff (items vs net_amount) παραπάνω, άλλο ζεύγος πεδίων:
@@ -2349,7 +2357,10 @@ def get_flagged_invoices():
             # συνόλου του.
             total_diff = None
             if net_amount is not None and inv['vat_amount'] is not None and inv['total_amount'] is not None:
-                total_diff = abs((net_amount + inv['vat_amount']) - inv['total_amount'])
+                if is_credit:
+                    total_diff = abs((net_amount + abs(inv['vat_amount'])) - abs(inv['total_amount']))
+                else:
+                    total_diff = abs((net_amount + inv['vat_amount']) - inv['total_amount'])
 
             # 24% ΦΠΑ δεν υπήρχε στην Ελλάδα πριν την 1/6/2016 (ήταν 23%) — σχεδόν
             # σίγουρα λάθος ανάγνωση, βλ. bug 2026-08-27.
