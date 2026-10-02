@@ -46,7 +46,7 @@ _ITEM_RE = re.compile(
     re.IGNORECASE,
 )
 _HEADER_RE = re.compile(
-    r'(Πιστωτικό Τιμολόγιο|Τιμολόγιο Πώλησης)\s+(\d+)\s*\n\s*(\d{2}/\d{2}/\d{4})')
+    r'(Πιστωτικό Τιμολόγιο|Τιμολόγιο Πώλησης)\s+(\d+)\s*\n\s*(\d{1,2}/\d{1,2}/\d{4})')
 _REL_RE = re.compile(r'([Α-ΩA-Z0-9]{2,8}\s*[-–]\s*\d+)\s*[-–]\s*(\d{1,2}/\d{1,2}/\d{4})')
 _OWN_RE = re.compile(r'^\s*(ΔΕ|ΔΑΠ)\s+(\d+)\s*$', re.MULTILINE)
 _VAT_RATES = (24, 13, 17, 9, 6, 0)
