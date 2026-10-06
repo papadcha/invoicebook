@@ -48,11 +48,15 @@ import 2026 (τιμολόγια+πιστωτικά NITROCHEM, βλ. section πα
       Και τα δύο επιβεβαιώθηκαν ως πραγματικά, διαφορετικά υλικά (όχι typo προς διόρθωση στο
       invoicebook) — δες PDF πηγές στο invoicebook αν χρειαστεί επιβεβαίωση.
 
-## [invoicebook] Presence detection (MEGA/rclone) — ενημερώθηκε 2026-10-01
+## [invoicebook] Presence detection (MEGA/rclone) — ενημερώθηκε 2026-10-05
 
 Δύο reference υλοποιήσεις υπάρχουν στα `expvault` και `lab-galatista`. Το invoicebook έχει πλέον υποδομή backup (rclone, MEGA/pCloud,
 NAS, backup-on-close). Το presence είναι η στρατηγική για να είναι το expvault διαθέσιμο σε περισσότερα μηχανήματα.
-- Σχεδιασμός/ένταξη presence στο invoicebook και στο ExpVault+ — **δεν έχει ξεκινήσει**, εξαρτάται από την απόφαση «πού ζει το expvault».
+- [x] **ExpVault+ 2.x: το presence λειτουργεί και στα 2 PC (έλεγχος 2026-10-05, βλ. DONE.md)** — το expvault υπάρχει και στα δύο
+      μηχανήματα, **χωρίς αποκλειστικότητα** (το presence ενημερώνει, δεν κλειδώνει). Heartbeat στο
+      `pcloud:expvaultplus-backup/presence/`, όριο λήξης ~3′. Η παλιότερη διατύπωση «ζει μόνο στο coding PC / ανοιχτή απόφαση πού ζει»
+      δεν ισχύει πια — αν βρεθεί αλλού στο TODO/DONE, είναι ξεπερασμένη.
+- Ανοιχτό: presence **στο ίδιο το invoicebook** (να φαίνεται ποιο PC το έχει ανοιχτό) — δεν έχει ξεκινήσει, ούτε αποφασίστηκε ότι χρειάζεται.
 
 ## [invoicebook] Ξανα-σαρώσεις του ίδιου χαρτιού — dedup πάνω στο κείμενο (Layer 1β)
 
