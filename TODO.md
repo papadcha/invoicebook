@@ -19,7 +19,7 @@
 
 - [ ] **Καθαρισμός παλιών projects στο coding PC (2026-10-02)**. **ΕΓΙΝΕ** (βλ. DONE.md): `C:/intake-tool`, `C:/report-tool`, υπολείμματα expvault v1 και τα δεδομένα v1 (`AppData/Roaming/expvault`) μετά από σύγκριση με το ExpVault+. **ΕΓΙΝΕ 2026-10-06**: οι 3 γενικές προτιμήσεις του `C--intake-tool/memory` αντιγράφηκαν στη μνήμη του `C--invoices`· στο `C:/expvault` σβήστηκαν `node_modules`, `dist`, `backend/build`, `backend/dist` (νέο build θέλει `npm install` + PyInstaller). **ΜΕΝΕΙ**: η διαγραφή του `~/.claude/projects/C--intake-tool` (πλέον 91 MB: 37 συνεδρίες + 4 αρχεία μνήμης — δεν αναιρείται, αναμένει απόφαση χρήστη).
 
-- [ ] **Backup config — έλεγχος μετά τον καθαρισμό pCloud (2026-10-06)**: (α) στο coding PC να μη δείχνει ο προορισμός σε `pcloud:/mega:invoicebook-backup-dev` (διαγράφηκε το pCloud dev)· (β) το `X:\InvoiceBookDataackup_config.json` έχει `enabled: false` — **σκόπιμο (επιβεβαίωση χρήστη 2026-10-06)**· (γ) το `mega:invoicebook-backup-dev` δεν ελέγχθηκε. Το presence ExpVault+ δουλεύει (βλ. DONE.md).
+- [ ] **Backup config — έλεγχος μετά τον καθαρισμό pCloud (2026-10-06)**: (α) ~~στο coding PC να μη δείχνει ο προορισμός σε `pcloud:/mega:invoicebook-backup-dev`~~ ΟΚ (επιβεβαίωση χρήστη 2026-10-06)· (β) το `X:\InvoiceBookDataackup_config.json` έχει `enabled: false` — **σκόπιμο (επιβεβαίωση χρήστη 2026-10-06)**· (γ) το `mega:invoicebook-backup-dev` δεν ελέγχθηκε. Το presence ExpVault+ δουλεύει (βλ. DONE.md).
 
 # ΠΑΡΚΑΡΙΣΜΕΝΑ — ιδέες και έλεγχοι χωρίς προθεσμία (ΔΕΝ είναι εκκρεμότητες)
 
