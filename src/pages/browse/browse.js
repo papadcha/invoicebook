@@ -115,7 +115,9 @@ let browseSortMode = 'date';
 const BROWSE_PAGE_SIZE = 200;
 let browsePage = 0;
 
-async function loadBrowse() {
+// keepPage: μετά από edit/διαγραφή/επιθεώρηση μένουμε στην ίδια σελίδα (το applyBrowseSearch
+// περιορίζει το browsePage αν η σελίδα δεν υπάρχει πια)· αλλαγή φίλτρου → από την αρχή.
+async function loadBrowse(keepPage = false) {
   const category = browseCategoryFilter || null;
   const [rows, flagged, summary] = await Promise.all([
     pyCall('list_invoice_items_by_category', { category }),
@@ -126,7 +128,7 @@ async function loadBrowse() {
   browseSeverityById = Object.fromEntries((flagged || []).map(f => [f.invoice_id, f.severity]));
   browseReasonById = Object.fromEntries((flagged || []).map(f => [f.invoice_id, f.reason]));
   renderStatusStats(summary);
-  browsePage = 0;
+  if (!keepPage) browsePage = 0;
   applyBrowseSearch(browseRows);
 }
 
@@ -275,7 +277,7 @@ function applyBrowseSearch(rows) {
     App.confirmDelete('Αναίρεση επιθεώρησης — το τιμολόγιο θα ξαναϋπολογιστεί αυτόματα ως σοβαρό/μέτριο;', async () => {
       try {
         await pyCallStrict('unreview_flagged_invoice', { invoice_id: parseInt(btn.dataset.unreviewInvoice, 10) });
-        loadBrowse();
+        loadBrowse(true);
       } catch (e) {
         App.toast(e.message, 'fail');
       }
@@ -300,7 +302,7 @@ document.getElementById('review-ok-btn').addEventListener('click', async () => {
   try {
     await pyCallStrict('review_flagged_invoice', { invoice_id: invoiceId, note });
     App.toast('✅ Επιθεωρήθηκε', 'ok');
-    loadBrowse();
+    loadBrowse(true);
   } catch (e) {
     App.toast(e.message, 'fail');
   }
@@ -617,7 +619,7 @@ document.getElementById('edit-pdf-attach-btn').addEventListener('click', async (
   try {
     const res = await pyCallStrict('attach_pdf', { id: invoiceId, source_path: filePath });
     App.toast('Το PDF επισυνάφθηκε', 'ok');
-    await loadBrowse();
+    await loadBrowse(true);
     currentPdfFilename = res.source_pdf_filename;
     const inv = await pyCall('get_invoice', { id: invoiceId });
     if (inv) refreshEditPdfStatus(inv);
@@ -695,7 +697,7 @@ document.getElementById('edit-invoice-save-btn').addEventListener('click', async
       pendingNewPdfPath = null;
     }
     closeEditModal();
-    loadBrowse();
+    loadBrowse(!isNew);
     window.reloadLookups();
   } catch (e) {
     App.toast(e.message, 'fail');
@@ -719,7 +721,7 @@ document.getElementById('edit-invoice-delete-btn').addEventListener('click', asy
     await pyCallStrict('delete_invoice', { id: invoiceId });
     App.toast('Το τιμολόγιο διαγράφηκε', 'ok');
     closeEditModal();
-    loadBrowse();
+    loadBrowse(true);
   } catch (e) {
     App.toast(e.message, 'fail');
   } finally {
