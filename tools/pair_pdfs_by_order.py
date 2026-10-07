@@ -48,7 +48,35 @@ def load_gemini_json(path):
         text = f.read()
     text = _CITE_RE.sub('', text).strip()
     text = re.sub(r'^```[a-zA-Z]*\s*', '', text)
-    return json.JSONDecoder().raw_decode(text)[0]
+    try:
+        return json.JSONDecoder().raw_decode(text)[0]
+    except json.JSONDecodeError as e:
+        sys.exit(_explain_json_error(text, e))
+
+
+def _explain_json_error(text, err):
+    """Κατανοητό μήνυμα για άκυρο JSON — το συχνότερο αίτιο είναι ΚΟΜΜΕΝΟ αρχείο
+    (η απάντηση του Gemini σταμάτησε στη μέση). Ίδια λογική με το
+    backend/bridge.py:_explain_json_error."""
+    stripped = text.rstrip()
+    if err.pos >= len(stripped) - 1 or not stripped.endswith((']', '}')):
+        complete = 0
+        start = text.find('[')
+        if start != -1:
+            dec, pos = json.JSONDecoder(), start + 1
+            while True:
+                while pos < len(text) and text[pos] in ' \t\r\n,':
+                    pos += 1
+                try:
+                    _, pos = dec.raw_decode(text, pos)
+                    complete += 1
+                except json.JSONDecodeError:
+                    break
+        return (f'Το JSON είναι κομμένο — η απάντηση του Gemini σταμάτησε στη μέση. '
+                f'Διαβάστηκαν {complete} πλήρη τιμολόγια, το επόμενο είναι ατελές. '
+                f'Ξαναζήτησέ το από το Gemini με το ίδιο αίτημα και κατέβασέ το '
+                f'αφού ολοκληρωθεί η απάντηση (να κλείνει με «]»).')
+    return f'Μη έγκυρο JSON (γραμμή {err.lineno}, στήλη {err.colno}): {err.msg}'
 
 
 def main():
