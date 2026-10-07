@@ -4,6 +4,10 @@
 `TODO.md` για ό,τι μένει. Ζει μόνο στο invoicebook repo (τα intake-tool/report-tool
 αποσύρθηκαν 2026-09-26/2026-09-30 και δεν συγχρονίζονται πια μαζί του).
 
+## [invoicebook] Project skill `run-invoicebook` (2026-10-07)
+
+Δημιουργήθηκε το `.claude/skills/run-invoicebook/SKILL.md` (commit `1bf84be`): οδηγίες εκκίνησης/δοκιμής της εφαρμογής (`npm start`, debug port + Playwright μέσω CDP στο scratchpad) πάνω σε **προσωρινό αντίγραφο** της βάσης μέσω `INVOICES_DB_PATH`, όχι στην πραγματική. Γράφτηκε από τον κώδικα/τεκμηρίωση και **δεν έχει δοκιμαστεί ακόμα end-to-end** — διόρθωση στην πρώτη πραγματική χρήση· ανοιχτό ερώτημα εκεί: αν το backup-on-close ανεβάζει backup του test db.
+
 ## [ExpVault+] Εξέταση κλάδου `backup/local-fixes-2026-07-10` (2026-10-06)
 
 Ο κλάδος (remote μόνο, `origin/backup/local-fixes-2026-07-10`, 2 commits πάνω από το v1.0.3: `25d15ca` migrations, `3326d0a` escaping/update-checker) συγκρίθηκε με το `v2`. **Συμπέρασμα: δεν χρειάζεται συγχώνευση — όλες οι διορθώσεις υπάρχουν ήδη στο `v2`.** (1) **Migrations**: το `init_db()` του v2 δημιουργεί πρώτα το πλήρες σχήμα (`CREATE TABLE IF NOT EXISTS`) και μετά τρέχει τα `ALTER TABLE` (kategoria, export_group, nomiki_katigoria, promitheftes.syntomografia, adeies.*), όπως στη διόρθωση. (2) **Escaping**: το `escapeHtml` υπάρχει στο `js/utils.js` και χρησιμοποιείται σε όλες τις σελίδες· τα μηνύματα toast που δεν περνούν από αυτό (`adeia_*`) εμφανίζονται με `textContent`, άρα δεν είναι πρόβλημα. (3) **Update-checker**: το `main.js` αγνοεί pre-release suffix (`split(/[-+]/)[0]`) και χρησιμοποιεί `parseVer` χωρίς NaN. (4) `backend/backup_config.json` είναι στο `.gitignore`. Ο κλάδος **διαγράφηκε από το remote** (`git push origin --delete`, εντολή χρήστη 2026-10-06· τελευταίο commit `3326d0a`).
