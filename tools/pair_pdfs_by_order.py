@@ -65,7 +65,12 @@ def main():
     if not os.path.isdir(folder):
         sys.exit(f'Δεν βρέθηκε ο φάκελος: {folder}')
 
-    pdfs = sorted(f for f in os.listdir(folder) if f.lower().endswith('.pdf'))
+    # Φυσική ταξινόμηση (1, 2, … 10), όχι αλφαβητική (1, 10, 2, …): τα ονόματα ξεκινούν
+    # με αριθμό σειράς σάρωσης και η αλφαβητική έβαζε το «10 …» πριν το «2 …».
+    pdfs = sorted(
+        (f for f in os.listdir(folder) if f.lower().endswith('.pdf')),
+        key=lambda f: [int(t) if t.isdigit() else t.lower() for t in re.split(r'(\d+)', f)],
+    )
     if not pdfs:
         sys.exit(f'Δεν βρέθηκαν PDF μέσα στο: {folder}')
 

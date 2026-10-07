@@ -140,15 +140,10 @@ document.getElementById('attach-da-btn').addEventListener('click', async () => {
       ...skipped.map(r => '✘ ' + r.file + ' — ' + r.message),
     ];
     if (!ready.length) {
-      App.toast('Κανένα δελτίο δεν μπορεί να ενωθεί:
-' + lines.join('
-'), 'fail');
+      App.toast('Κανένα δελτίο δεν μπορεί να ενωθεί:\n' + lines.join('\n'), 'fail');
       return;
     }
-    if (!window.confirm(`Ένωση ${ready.length} δελτίων αποστολής πίσω από τα τιμολόγια τους;
-
-` + lines.join('
-'))) return;
+    if (!window.confirm(`Ένωση ${ready.length} δελτίων αποστολής πίσω από τα τιμολόγια τους;\n\n` + lines.join('\n'))) return;
     const done = await pyCallStrict('attach_delivery_notes', { file_paths: ready.map(r => paths.find(p => p.endsWith(r.file))), apply: true });
     const ok = done.filter(r => r.status === 'applied').length;
     App.toast(`Ενώθηκαν ${ok} δελτία αποστολής` + (skipped.length ? ` — ${skipped.length} δεν ενώθηκαν (δες την προηγούμενη λίστα)` : ''), ok === done.length ? 'ok' : 'warn');
