@@ -6,7 +6,7 @@
 
 ## [invoicebook] Project skill `run-invoicebook` (2026-10-07)
 
-Δημιουργήθηκε το `.claude/skills/run-invoicebook/SKILL.md` (commit `9f525b1`): οδηγίες εκκίνησης/δοκιμής της εφαρμογής (`npm start`, debug port + Playwright μέσω CDP στο scratchpad) πάνω σε **προσωρινό αντίγραφο** της βάσης μέσω `INVOICES_DB_PATH`, όχι στην πραγματική. Γράφτηκε από τον κώδικα/τεκμηρίωση και **δεν έχει δοκιμαστεί ακόμα end-to-end** — διόρθωση στην πρώτη πραγματική χρήση· ανοιχτό ερώτημα εκεί: αν το backup-on-close ανεβάζει backup του test db.
+Δημιουργήθηκε το `.claude/skills/run-invoicebook/SKILL.md` (commit `9f525b1`): οδηγίες εκκίνησης/δοκιμής της εφαρμογής (`npm start`, debug port + Playwright μέσω CDP στο scratchpad) πάνω σε **προσωρινό αντίγραφο** της βάσης μέσω `INVOICES_DB_PATH`, όχι στην πραγματική. **Δοκιμάστηκε end-to-end 2026-10-07** (εκκίνηση με αντίγραφο βάσης, σύνδεση Playwright, screenshot, `navigateTo('browse')`, κλήση backend — όλα ΟΚ, commit `e8d64c4`). Το backup-on-close είναι ασφαλές με προσωρινό αντίγραφο: το `backup_config.json` αναζητείται δίπλα στη βάση, άρα δεν υπάρχει εκεί και δεν ανεβαίνει τίποτα. Η dev βάση `backend/invoicebook.db` είναι άδεια (0 τιμολόγια).
 
 ## [ExpVault+] Εξέταση κλάδου `backup/local-fixes-2026-07-10` (2026-10-06)
 
