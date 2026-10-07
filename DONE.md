@@ -6,7 +6,7 @@
 
 ## [invoicebook] Project skill `run-invoicebook` (2026-10-07)
 
-Δημιουργήθηκε το `.claude/skills/run-invoicebook/SKILL.md` (commit `1bf84be`): οδηγίες εκκίνησης/δοκιμής της εφαρμογής (`npm start`, debug port + Playwright μέσω CDP στο scratchpad) πάνω σε **προσωρινό αντίγραφο** της βάσης μέσω `INVOICES_DB_PATH`, όχι στην πραγματική. Γράφτηκε από τον κώδικα/τεκμηρίωση και **δεν έχει δοκιμαστεί ακόμα end-to-end** — διόρθωση στην πρώτη πραγματική χρήση· ανοιχτό ερώτημα εκεί: αν το backup-on-close ανεβάζει backup του test db.
+Δημιουργήθηκε το `.claude/skills/run-invoicebook/SKILL.md` (commit `9f525b1`): οδηγίες εκκίνησης/δοκιμής της εφαρμογής (`npm start`, debug port + Playwright μέσω CDP στο scratchpad) πάνω σε **προσωρινό αντίγραφο** της βάσης μέσω `INVOICES_DB_PATH`, όχι στην πραγματική. Γράφτηκε από τον κώδικα/τεκμηρίωση και **δεν έχει δοκιμαστεί ακόμα end-to-end** — διόρθωση στην πρώτη πραγματική χρήση· ανοιχτό ερώτημα εκεί: αν το backup-on-close ανεβάζει backup του test db.
 
 ## [ExpVault+] Εξέταση κλάδου `backup/local-fixes-2026-07-10` (2026-10-06)
 
