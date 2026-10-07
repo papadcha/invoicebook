@@ -58,6 +58,14 @@ await page.screenshot({ path: 'shot.png' });
 
 ## 4. Καθαρισμός
 
-Κλείσε το Electron, σβήσε `$env:TEMP\ib-test` και καθάρισε το env var (`Remove-Item Env:INVOICES_DB_PATH`). Το κλείσιμο μπορεί να τρέξει backup-on-close — με `INVOICES_DB_PATH` σε προσωρινό αντίγραφο έλεγξε ότι δεν ανεβαίνει backup του test db σε NAS/pCloud πριν το αφήσεις να τρέξει (δες `backend/backup.py` και τη ρύθμιση backup).
+Κλείσε το Electron (`Get-Process electron | Stop-Process -Force`) και σβήσε `$env:TEMP\ib-test`. Το env var δεν χρειάζεται καθάρισμα αν το όρισες μέσα στην εντολή εκκίνησης (κάθε κλήση PowerShell έχει δικό της περιβάλλον).
 
-Σημ.: ο οδηγός αυτός γράφτηκε από τον κώδικα/τεκμηρίωση και δεν έχει ακόμα δοκιμαστεί end-to-end — διόρθωσέ τον στην πρώτη πραγματική χρήση.
+**Backup-on-close είναι ασφαλές με το προσωρινό αντίγραφο**: το `backup_config.json` αναζητείται δίπλα στη βάση (`backup.DATA_DIR = dirname(DB_PATH)`), άρα στο `ib-test` δεν υπάρχει και δεν ανεβαίνει τίποτα. **Μην αντιγράψεις** το `backup_config.json` εκεί.
+
+## Δοκιμάστηκε (2026-10-07)
+
+Τρέχει end-to-end: `npx electron . --remote-debugging-port=9222` (με `INVOICES_DB_PATH` στο αντίγραφο, ως background εντολή) → `[Bridge] Ready` → `connectOverCDP` → screenshot, `navigateTo('browse')`, κλήση backend. Παρατηρήσεις:
+- Η εντολή εκκίνησης μένει σε εκτέλεση· τρέξ' την ως background και περίμενε ~6" πριν συνδεθείς. Το kill του Electron την τερματίζει με exit 255 (αναμενόμενο).
+- `window.api.call(...)` επιστρέφει `{ok, result}`, όχι απευθείας το αποτέλεσμα.
+- Η dev βάση `backend/invoicebook.db` είναι μικρή και **άδεια** (0 τιμολόγια, 0 προμηθευτές) — για δοκιμές με δεδομένα χρειάζεται αντίγραφο της πραγματικής βάσης (π.χ. από το data drive) και `snapshot`/προσοχή όπως παραπάνω.
+- `page.evaluate(() => navigateTo('browse'))` δουλεύει· τα page ids είναι στο `Pages` του `js/main-app.js`.
