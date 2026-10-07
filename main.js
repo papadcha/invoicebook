@@ -64,8 +64,11 @@ function startBridge() {
   });
 
   let buffer = '';
+  // setEncoding (StringDecoder) αντί για data.toString() ανά κομμάτι: αλλιώς ένας
+  // πολυbyte χαρακτήρας (ελληνικά = 2 bytes) που κόβεται στο όριο δύο chunks γίνεται «��».
+  pythonProcess.stdout.setEncoding('utf8');
   pythonProcess.stdout.on('data', (data) => {
-    buffer += data.toString();
+    buffer += data;
     const lines = buffer.split('\n');
     buffer = lines.pop();
     for (const line of lines) {
