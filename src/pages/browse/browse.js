@@ -501,6 +501,9 @@ document.getElementById('split-item-ok-btn').addEventListener('click', async () 
     await pyCallStrict('split_invoice_item', { item_id: itemId, splits });
     document.getElementById('split-item-modal').classList.remove('open');
     App.toast('Η γραμμή διασπάστηκε', 'ok');
+    // Το split μπορεί να δημιούργησε νέο μηχάνημα (_find_or_create_machine) -- χωρίς ανανέωση
+    // της κρυφής λίστας το openEditInvoice δεν βρίσκει το όνομα και δείχνει κενό πεδίο.
+    await window.reloadLookups();
     const invoiceId = parseInt(document.getElementById('edit-invoice-id').value, 10);
     await openEditInvoice(invoiceId);
   } catch (e) {

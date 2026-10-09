@@ -505,13 +505,33 @@ def _find_duplicate(conn, header, exclude_id=None):
     supplier_id = header.get('supplier_id')
     if not doc_number or not doc_date or not supplier_id:
         return None
-    row = conn.execute(
+    rows = conn.execute(
         'SELECT * FROM tbl_invoices WHERE doc_number=? AND doc_date=? AND supplier_id=?',
         (doc_number, doc_date, supplier_id)
-    ).fetchone()
-    if row and (exclude_id is None or row['id'] != exclude_id):
+    ).fetchall()
+    for row in rows:
+        if exclude_id is not None and row['id'] == exclude_id:
+            continue
+        if _is_distinct_document(row['doc_type'], row['total_amount'],
+                                 header.get('doc_type'), header.get('total_amount')):
+            continue
         return row
     return None
+
+
+def _is_distinct_document(type_a, total_a, type_b, total_b):
+    """Δύο παραστατικά με ίδιο προμηθευτή/αριθμό/ημερομηνία είναι ΞΕΧΩΡΙΣΤΑ (όχι διπλότυπα)
+    όταν διαφέρουν ΚΑΙ ο τύπος ΚΑΙ το σύνολο -- π.χ. ΤΔΑ 612 (34,72€) και ΤΠΥ 612 (372€) του
+    ΔΙΔΗ, 02/04/2025: οι δύο σειρές έχουν ξεχωριστή αρίθμηση και βγήκαν με τον ίδιο αριθμό
+    (2026-10-09). Ο τύπος μόνος του δεν αρκεί: μια διπλή σάρωση του ίδιου χαρτιού με αλλαγμένη
+    ανάγνωση τύπου έχει το ίδιο σύνολο και πρέπει να πιάνεται. Λείπει τύπος ή σύνολο → διπλότυπο."""
+    type_a, type_b = canonical_doc_type(type_a), canonical_doc_type(type_b)
+    if not type_a or not type_b or type_a == type_b:
+        return False
+    try:
+        return round(float(total_a), 2) != round(float(total_b), 2)
+    except (TypeError, ValueError):
+        return False
 
 
 def _insert_invoice(conn, header, items):
@@ -1880,13 +1900,17 @@ def find_duplicate_invoice(header):
                 supplier_id = row['id']
         if supplier_id is None:
             return None
-        row = conn.execute(
-            '''SELECT i.id, i.doc_number, i.doc_date, i.total_amount, s.name as supplier_name
+        rows = conn.execute(
+            '''SELECT i.id, i.doc_number, i.doc_date, i.doc_type, i.total_amount, s.name as supplier_name
                FROM tbl_invoices i JOIN tbl_suppliers s ON s.id = i.supplier_id
                WHERE i.doc_number=? AND i.doc_date=? AND i.supplier_id=?''',
             (doc_number, doc_date, supplier_id)
-        ).fetchone()
-        return dict(row) if row else None
+        ).fetchall()
+        for row in rows:
+            if not _is_distinct_document(row['doc_type'], row['total_amount'],
+                                         header.get('doc_type'), header.get('total_amount')):
+                return dict(row)
+        return None
 
 
 CURRENT_PDF_SENTINEL = '__CURRENT_PDF__'  # στη θέση ενός staging row's source_pdf_path μέσα σε
@@ -2288,16 +2312,22 @@ def get_flagged_invoices():
             LEFT JOIN tbl_suppliers s ON s.id = i.supplier_id
         ''').fetchall()
 
-        dup_rows = conn.execute('''
-            SELECT GROUP_CONCAT(id) as ids
+        # Ίδιο κριτήριο με το _find_duplicate(): ξεχωριστά παραστατικά (διαφορετικός τύπος ΚΑΙ
+        # σύνολο, π.χ. ΤΔΑ/ΤΠΥ του ΔΙΔΗ με ίδιο αριθμό) δεν σημαίνονται ως διπλότυπα.
+        dup_groups = {}
+        for r in conn.execute('''
+            SELECT id, doc_type, total_amount, doc_number, doc_date, supplier_id
             FROM tbl_invoices
             WHERE doc_number IS NOT NULL AND doc_number != ''
-            GROUP BY doc_number, doc_date, supplier_id
-            HAVING COUNT(*) > 1
-        ''').fetchall()
+        '''):
+            dup_groups.setdefault((r['doc_number'], r['doc_date'], r['supplier_id']), []).append(r)
         duplicate_ids = set()
-        for r in dup_rows:
-            duplicate_ids.update(int(x) for x in r['ids'].split(','))
+        for group in dup_groups.values():
+            for a in group:
+                if any(a['id'] != b['id'] and not _is_distinct_document(
+                        a['doc_type'], a['total_amount'], b['doc_type'], b['total_amount'])
+                       for b in group):
+                    duplicate_ids.add(a['id'])
 
         items_by_invoice = {}
         for it in conn.execute(
