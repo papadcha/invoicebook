@@ -674,6 +674,9 @@ document.getElementById('desc-rule-preview-btn').addEventListener('click', async
       ${p.changes.length ? `<div class="table-wrap" style="max-height:340px; overflow:auto;"><table>
         <thead><tr><th>Κατηγορία</th><th>Παλιά</th><th>Νέα</th><th>Γραμμές</th></tr></thead><tbody>${rows}</tbody></table></div>
         ${p.truncated ? '<p class="muted-sm">Εμφανίζονται οι πρώτες 500 αλλαγές — εφαρμόζονται όλες.</p>' : ''}` : ''}
+      ${p.unchanged && p.unchanged.length ? `<details style="margin-top:8px;"><summary class="muted-sm" style="cursor:pointer;">Δεν ταιριάζουν στον κανόνα (${p.unchanged_groups}) — μένουν όπως είναι</summary>
+        <ul style="margin:6px 0 0 20px; font-size:12.5px; color:var(--muted);">${p.unchanged.map(u => `<li>${u.category == null ? '—' : escapeHtml(u.category)} · ${escapeHtml(u.description)}</li>`).join('')}</ul>
+        <p class="muted-sm" style="margin-top:6px;">Ο κανόνας ταιριάζει <b>κυριολεκτικά</b> (πεζά/κεφαλαία, ελληνικά/λατινικά γράμματα, κενά), σε αντίθεση με την αναζήτηση. Πρόσθεσε <code>(?i)</code> στην αρχή για πεζά/κεφαλαία· αν η περιγραφή έχει ελληνικά γράμματα που μοιάζουν με λατινικά, χρησιμοποίησε κλάσεις π.χ. <code>[ΒB][ΕE][ΑA][ΡP]</code>.</p></details>` : ''}
       ${lastRulePreview
         ? `<p class="muted-sm" style="margin-top:8px;">Δεν έχει γραφτεί τίποτα ακόμα. Η αλλαγή καταγράφεται και αναιρείται από το «Ιστορικό αλλαγών».${lastRulePreview.saveName ? ` Θα αποθηκευτεί και ο μόνιμος κανόνας «${escapeHtml(lastRulePreview.saveName)}».` : ''}</p>
            <div class="form-actions" style="margin-top:8px;"><button type="button" class="btn btn-primary" id="desc-rule-apply-btn">Εφαρμογή</button></div>`

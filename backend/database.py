@@ -713,9 +713,14 @@ def preview_description_rule(items, pattern, replacement, scope_all=False):
             lines += len(rows)
             invoices.update(inv for _, inv in rows)
             listing.append({'category': cat, 'old': old, 'new': new, 'line_count': len(rows), 'merges_into_existing': existing})
+    # Επιλεγμένες που ΔΕΝ ταίριαξαν (για να φαίνεται ΓΙΑΤΙ -- π.χ. κυριολεκτικό regex έναντι «έξυπνης» αναζήτησης)·
+    # στο scope_all θα ήταν χιλιάδες, οπότε μόνο ο αριθμός.
+    changed_keys = {(cat, old) for cat, old, _, _ in changes}
+    unchanged = [] if scope_all else [{'category': it.get('category') or None, 'description': it.get('description')}
+                                       for it in items if ((it.get('category') or None), it.get('description')) not in changed_keys]
     return {'selected_groups': len(items), 'groups_to_change': len(changes), 'lines_to_change': lines,
             'invoices_to_change': len(invoices), 'unchanged_groups': len(items) - len(changes),
-            'changes': listing[:500], 'truncated': len(listing) > 500}
+            'changes': listing[:500], 'truncated': len(listing) > 500, 'unchanged': unchanged[:200]}
 
 
 def apply_description_rule(items, pattern, replacement, expected_lines=None, save_rule_name=None, scope_all=False):
