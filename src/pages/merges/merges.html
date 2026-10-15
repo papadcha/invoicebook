@@ -104,6 +104,31 @@
 <!-- ── ΠΕΡΙΓΡΑΦΕΣ ── -->
 <div class="subtab-panel" id="panel-descriptions" style="display:none;">
   <div class="card">
+    <div class="card-title">Αναζήτηση περιγραφών</div>
+    <p class="muted-sm" style="margin-bottom:14px;">
+      Γράψε μέρος της περιγραφής (π.χ. «παλετ», «sae 15w40», «περιβαλλοντικ εισφορ») — κεφαλαία/τόνοι/κενά/παύλες δεν παίζουν ρόλο,
+      πολλές λέξεις = όλες πρέπει να υπάρχουν. Εμφανίζονται και γραμμές χωρίς κατηγορία. Τσέκαρε όσες θέλεις και δες προεπισκόπηση.
+      <b>Προς το παρόν μόνο προεπισκόπηση</b> — η εφαρμογή της αλλαγής (με αναίρεση) θα προστεθεί στο επόμενο βήμα.
+    </p>
+    <div class="form-row" style="max-width:520px;">
+      <div><label for="desc-search-input">Αναζήτηση</label><input type="text" id="desc-search-input" placeholder="π.χ. παλετ" autocomplete="off"></div>
+    </div>
+    <p class="muted-sm" id="desc-search-summary"></p>
+    <div id="desc-search-results"></div>
+
+    <div id="desc-action-box" style="display:none; margin-top:16px; padding-top:12px; border-top:1px solid var(--border, #ddd);">
+      <p style="margin-bottom:8px;"><b id="desc-selected-count"></b>
+        <button type="button" class="btn btn-outline btn-sm" id="desc-clear-selection-btn" style="margin-left:8px;">Καθαρισμός επιλογής</button></p>
+      <div class="form-row cols-2" style="max-width:720px;">
+        <div><label for="desc-new-description">Νέα περιγραφή (όλες οι επιλεγμένες γίνονται αυτή)</label><input type="text" id="desc-new-description" placeholder="Επίλεξε από τις επιλεγμένες ή γράψε νέα" autocomplete="off"></div>
+        <div><label for="desc-new-category">Νέα κατηγορία (προαιρετικό)</label><input type="text" id="desc-new-category" placeholder="Άφησέ το κενό για να μείνει ίδια" autocomplete="off"></div>
+      </div>
+      <div class="form-actions" style="margin-top:0;"><button type="button" class="btn btn-outline" id="desc-preview-btn">Προεπισκόπηση</button></div>
+      <div id="desc-preview-result" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="card-title">Υποψήφιες Ομαδοποιήσεις</div>
     <p class="muted-sm" style="margin-bottom:14px;">
       Παλιές γραμμές τιμολογίων που η περιγραφή τους διαφέρει μόνο σε μορφοποίηση (κενά/παύλες/κεφαλαία) —

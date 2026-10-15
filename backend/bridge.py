@@ -229,6 +229,25 @@ def handle(cmd, payload):
     if cmd == 'merge_item_descriptions':
         return database.merge_item_descriptions(payload['category'], payload['keep'], payload['merge_list'])
 
+    if cmd == 'search_item_descriptions':
+        return database.search_item_descriptions(payload.get('query'))
+
+    if cmd == 'preview_description_change':
+        res = database.preview_description_change(
+            payload.get('items') or [], payload.get('new_description'), payload.get('new_category'))
+        # Εκρηκτικά: το όνομα υλικού πρέπει να υπάρχει στον κατάλογο του ExpVault+ (βλ. expvault_materials)
+        # -- ειδικό για το expvault, γι' αυτό ο έλεγχος ζει εδώ και όχι στο database.py.
+        res['warnings'] = []
+        target_cats = {expvault_export._norm(c) for c in res['current_categories'] if c}
+        if res['new_category']:
+            target_cats.add(expvault_export._norm(res['new_category']))
+        if (res['new_description'] and expvault_export._norm(expvault_export.CATEGORY) in target_cats
+                and not expvault_export.canonical_material(res['new_description'])):
+            res['warnings'].append(
+                f'Η περιγραφή «{res["new_description"]}» δεν υπάρχει στον κατάλογο υλικών του ExpVault+ — '
+                'η εξαγωγή εκρηκτικών θα δείχνει προειδοποίηση «νέο υλικό».')
+        return res
+
     if cmd == 'get_machine_merge_candidates':
         return database.get_machine_merge_candidates()
 

@@ -142,6 +142,7 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'find_duplicate_invoice', 'merge_documents',
   'get_supplier_merge_candidates', 'get_supplier_merge_preview', 'merge_suppliers',
   'get_description_merge_candidates', 'merge_item_descriptions',
+  'search_item_descriptions', 'preview_description_change',
   'get_machine_merge_candidates', 'get_machine_merge_preview', 'merge_machines',
   'get_orphan_machines', 'delete_orphan_machines', 'get_single_supplier_plate_machines',
   'get_unit_variants', 'merge_units',

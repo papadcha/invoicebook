@@ -445,6 +445,108 @@ def merge_item_descriptions(category, keep, merge_list):
     return {'updated_rows': total}
 
 
+def search_item_descriptions(query, limit=300):
+    """Αναζήτηση διακριτών περιγραφών γραμμών (category, description) για τον καθαρισμό
+    περιγραφών (tab «Περιγραφές» της Διαχείρισης) -- μόνο ανάγνωση, δεν αλλάζει τίποτα.
+    Η αναζήτηση δουλεύει στο ΙΔΙΟ κανονικοποιημένο κλειδί με το _canonicalize_description
+    (κεφαλαία/τόνοι/κενά/παύλες/ελληνικά-λατινικά ίδια γράμματα αγνοούνται), άρα «παλετ»
+    πιάνει «ΠΑΛΕΤΕΣ 80X1.20» και «Παλέτες»· πολλές λέξεις = όλες πρέπει να υπάρχουν, με
+    οποιαδήποτε σειρά. Περιλαμβάνει και γραμμές ΧΩΡΙΣ κατηγορία (category NULL), που η λίστα
+    υποψηφίων ομαδοποιήσεων αγνοεί. Κάθε αποτέλεσμα: ένα (category, description)."""
+    tokens = [t for t in (_normalize_machine_code(w) for w in (query or '').split()) if t]
+    if not tokens or sum(len(t) for t in tokens) < 2:
+        return {'groups': [], 'total': 0, 'truncated': False}
+
+    with get_db() as conn:
+        rows = conn.execute(
+            '''SELECT t.category AS category, t.description AS description, i.supplier_id AS supplier_id,
+                      COALESCE(s.name, '—') AS supplier, COUNT(*) AS line_count,
+                      COUNT(DISTINCT t.invoice_id) AS invoice_count,
+                      MIN(i.doc_date) AS date_min, MAX(i.doc_date) AS date_max,
+                      SUM(t.value) AS value_sum, MIN(t.unit_price) AS price_min, MAX(t.unit_price) AS price_max
+               FROM tbl_invoice_items t
+               JOIN tbl_invoices i ON i.id = t.invoice_id
+               LEFT JOIN tbl_suppliers s ON s.id = i.supplier_id
+               WHERE t.description IS NOT NULL AND t.description != ''
+               GROUP BY t.category, t.description, i.supplier_id'''
+        ).fetchall()
+
+    key_cache = {}
+    groups = {}
+    for r in rows:
+        desc = r['description']
+        key = key_cache.get(desc)
+        if key is None:
+            key = key_cache[desc] = _normalize_machine_code(desc)
+        if not all(t in key for t in tokens):
+            continue
+        g = groups.setdefault((r['category'], desc), {
+            'category': r['category'], 'description': desc, 'line_count': 0, 'invoice_count': 0,
+            'date_min': None, 'date_max': None, 'value_sum': 0.0,
+            'price_min': None, 'price_max': None, 'suppliers': [],
+        })
+        g['line_count'] += r['line_count']
+        g['invoice_count'] += r['invoice_count']  # ένα τιμολόγιο έχει έναν προμηθευτή -- δεν διπλομετράται
+        g['value_sum'] += r['value_sum'] or 0.0
+        for field, pick in (('date_min', min), ('price_min', min), ('date_max', max), ('price_max', max)):
+            v = r[field]
+            if v is not None:
+                g[field] = v if g[field] is None else pick(g[field], v)
+        g['suppliers'].append((r['supplier'], r['line_count']))
+
+    out = []
+    for g in groups.values():
+        sups = sorted(g['suppliers'], key=lambda x: -x[1])
+        g['supplier_count'] = len(sups)
+        g['suppliers'] = [name for name, _ in sups[:3]]
+        g['value_sum'] = round(g['value_sum'], 2)
+        out.append(g)
+    # κατηγορία (NULL τελευταία), μετά περισσότερες γραμμές πρώτα
+    out.sort(key=lambda g: (g['category'] is None, g['category'] or '', -g['line_count'], g['description']))
+    return {'groups': out[:limit], 'total': len(out), 'truncated': len(out) > limit}
+
+
+def preview_description_change(items, new_description=None, new_category=None):
+    """Προεπισκόπηση (ΜΟΝΟ ανάγνωση) αλλαγής περιγραφής/κατηγορίας σε επιλεγμένες ομάδες
+    (category, description): πόσες γραμμές/τιμολόγια θα αλλάξουν πραγματικά -- ομάδες που ήδη
+    έχουν την τιμή-στόχο δεν μετράνε. Η εφαρμογή (με αναίρεση) είναι ξεχωριστό βήμα."""
+    new_description = (new_description or '').strip() or None
+    new_category = (new_category or '').strip() or None
+    if not items:
+        raise ValueError('Δεν επιλέχθηκε καμία περιγραφή')
+    if new_description is None and new_category is None:
+        raise ValueError('Δώσε νέα περιγραφή ή νέα κατηγορία')
+
+    selected_lines = 0
+    change_lines = 0
+    change_invoices = set()
+    categories = set()
+    unchanged_groups = 0
+    with get_db() as conn:
+        for it in items:
+            cat, desc = it.get('category') or None, it.get('description')
+            rows = conn.execute(
+                'SELECT id, invoice_id FROM tbl_invoice_items WHERE category IS ? AND description = ?',
+                (cat, desc)
+            ).fetchall()
+            selected_lines += len(rows)
+            categories.add(cat)
+            same_desc = new_description is None or desc == new_description
+            same_cat = new_category is None or cat == new_category
+            if same_desc and same_cat:
+                unchanged_groups += 1
+                continue
+            change_lines += len(rows)
+            change_invoices.update(r['invoice_id'] for r in rows)
+    return {
+        'selected_groups': len(items), 'selected_lines': selected_lines,
+        'lines_to_change': change_lines, 'invoices_to_change': len(change_invoices),
+        'unchanged_groups': unchanged_groups,
+        'current_categories': sorted(categories, key=lambda c: (c is None, c or '')),
+        'new_description': new_description, 'new_category': new_category,
+    }
+
+
 # ── ΤΙΜΟΛΟΓΙΑ ─────────────────────────────────────────────────────────────────
 
 def _pdf_available(filename):

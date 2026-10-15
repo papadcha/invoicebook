@@ -430,6 +430,129 @@ async function loadDescriptionCandidates() {
   }));
 }
 
+// ── ΑΝΑΖΗΤΗΣΗ ΠΕΡΙΓΡΑΦΩΝ (καθαρισμός περιγραφών) ─────────────────────────────
+// Μόνο ανάγνωση + προεπισκόπηση· η εφαρμογή αλλαγής (με αναίρεση) είναι επόμενο βήμα, βλ. TODO.md
+// «Διαχείριση περιγραφών». Η επιλογή κρατιέται ανάμεσα σε αναζητήσεις (Map κλειδί → ομάδα), ώστε
+// να μαζευτούν περιγραφές από πολλές αναζητήσεις («παλετ», μετά «παλλετ»…) πριν την προεπισκόπηση.
+const descSelected = new Map();   // key → { category, description }
+let descGroups = [];              // τα τρέχοντα αποτελέσματα αναζήτησης
+let descSearchSeq = 0;
+let descSearchTimer = null;
+
+const descKey = (category, description) => `${category ?? ''}\x1f${description}`;
+const descCatLabel = c => c == null ? '<span class="muted-sm">— χωρίς κατηγορία —</span>' : `<span class="badge badge-neutral">${escapeHtml(c)}</span>`;
+
+function descRange(a, b, fmt) {
+  if (a == null && b == null) return '—';
+  return (a === b || b == null) ? fmt(a) : `${fmt(a)} – ${fmt(b)}`;
+}
+
+async function runDescSearch() {
+  const q = document.getElementById('desc-search-input').value.trim();
+  const summary = document.getElementById('desc-search-summary');
+  const el = document.getElementById('desc-search-results');
+  if (q.replace(/\s/g, '').length < 2) { descGroups = []; el.innerHTML = ''; summary.textContent = ''; return; }
+  const seq = ++descSearchSeq;
+  summary.textContent = 'Αναζήτηση…';
+  const res = await pyCall('search_item_descriptions', { query: q });
+  if (seq !== descSearchSeq) return; // πιο πρόσφατη αναζήτηση έχει ήδη ξεκινήσει
+  if (!res) { summary.textContent = 'Αποτυχία αναζήτησης.'; return; }
+  descGroups = res.groups;
+  summary.textContent = res.total
+    ? `${res.total} διακριτές περιγραφές${res.truncated ? ` (εμφανίζονται οι πρώτες ${res.groups.length} — στένεψε την αναζήτηση)` : ''}`
+    : 'Καμία περιγραφή δεν ταιριάζει.';
+  renderDescResults();
+}
+
+function renderDescResults() {
+  const el = document.getElementById('desc-search-results');
+  if (!descGroups.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th style="width:32px;"></th><th>Κατηγορία</th><th>Περιγραφή</th><th>Γραμμές / τιμολόγια</th><th>Προμηθευτές</th><th>Τιμή μονάδας</th><th>Ημερομηνίες</th><th></th></tr></thead>
+    <tbody>${descGroups.map((g, i) => `
+      <tr>
+        <td><input type="checkbox" data-desc-i="${i}" ${descSelected.has(descKey(g.category, g.description)) ? 'checked' : ''}></td>
+        <td>${descCatLabel(g.category)}</td>
+        <td>${escapeHtml(g.description)}</td>
+        <td class="muted-sm">${g.line_count} / ${g.invoice_count}</td>
+        <td class="muted-sm">${g.suppliers.map(escapeHtml).join(', ')}${g.supplier_count > g.suppliers.length ? ` +${g.supplier_count - g.suppliers.length}` : ''}</td>
+        <td class="muted-sm">${descRange(g.price_min, g.price_max, n => n == null ? '—' : Number(n).toLocaleString('el-GR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}</td>
+        <td class="muted-sm">${descRange(g.date_min, g.date_max, fmtDate)}</td>
+        <td style="white-space:nowrap;"><button type="button" class="btn btn-outline btn-sm" data-desc-use="${i}" title="Χρήση ως νέα περιγραφή (και κατηγορία)">↓ ως στόχος</button></td>
+      </tr>`).join('')}</tbody></table></div>`;
+}
+
+function updateDescActionBox() {
+  const box = document.getElementById('desc-action-box');
+  box.style.display = descSelected.size ? '' : 'none';
+  document.getElementById('desc-selected-count').textContent = `Επιλεγμένες: ${descSelected.size} περιγραφές`;
+  document.getElementById('desc-preview-result').innerHTML = '';
+}
+
+document.getElementById('desc-search-input').addEventListener('input', () => {
+  clearTimeout(descSearchTimer);
+  descSearchTimer = setTimeout(runDescSearch, 300);
+});
+document.getElementById('desc-search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { clearTimeout(descSearchTimer); runDescSearch(); }
+});
+
+document.getElementById('desc-search-results').addEventListener('change', e => {
+  const cb = e.target.closest('[data-desc-i]');
+  if (!cb) return;
+  const g = descGroups[parseInt(cb.dataset.descI, 10)];
+  const key = descKey(g.category, g.description);
+  if (cb.checked) descSelected.set(key, { category: g.category, description: g.description });
+  else descSelected.delete(key);
+  updateDescActionBox();
+});
+
+document.getElementById('desc-search-results').addEventListener('click', e => {
+  const btn = e.target.closest('[data-desc-use]');
+  if (!btn) return;
+  const g = descGroups[parseInt(btn.dataset.descUse, 10)];
+  document.getElementById('desc-new-description').value = g.description;
+  document.getElementById('desc-new-category').value = g.category || '';
+  const key = descKey(g.category, g.description);
+  descSelected.set(key, { category: g.category, description: g.description });
+  renderDescResults();
+  updateDescActionBox();
+});
+
+document.getElementById('desc-clear-selection-btn').addEventListener('click', () => {
+  descSelected.clear();
+  renderDescResults();
+  updateDescActionBox();
+});
+
+attachAutocomplete(document, '#desc-new-description', () => [...descSelected.values()].map(s => s.description), { normalize: normalizeGreek });
+attachAutocomplete(document, '#desc-new-category', () => window.AppState.categories || [], { normalize: normalizeGreek });
+
+document.getElementById('desc-preview-btn').addEventListener('click', async () => {
+  const out = document.getElementById('desc-preview-result');
+  const btn = document.getElementById('desc-preview-btn');
+  const newDescription = document.getElementById('desc-new-description').value.trim();
+  const newCategory = document.getElementById('desc-new-category').value.trim();
+  if (!newDescription && !newCategory) { out.innerHTML = '<p class="muted-sm">Δώσε νέα περιγραφή ή νέα κατηγορία.</p>'; return; }
+  const unlock = _lock(btn);
+  try {
+    const p = await pyCallStrict('preview_description_change', {
+      items: [...descSelected.values()], new_description: newDescription || null, new_category: newCategory || null,
+    });
+    out.innerHTML = `
+      <p>Θα αλλάξ${p.lines_to_change === 1 ? 'ει' : 'ουν'} <b>${p.lines_to_change}</b> γραμμ${p.lines_to_change === 1 ? 'ή' : 'ές'} σε <b>${p.invoices_to_change}</b> τιμολόγι${p.invoices_to_change === 1 ? 'ο' : 'α'}
+        <span class="muted-sm">(επιλεγμένες: ${p.selected_groups} περιγραφές, ${p.selected_lines} γραμμές${p.unchanged_groups ? ` · ${p.unchanged_groups} ήδη έχουν την τιμή-στόχο` : ''})</span></p>
+      <p class="muted-sm">${p.new_description ? `Νέα περιγραφή: <b>${escapeHtml(p.new_description)}</b>` : 'Η περιγραφή μένει ίδια'} ·
+        ${p.new_category ? `Νέα κατηγορία: <b>${escapeHtml(p.new_category)}</b>` : 'η κατηγορία μένει ίδια'}</p>
+      ${p.warnings.map(w => `<p style="color:#856404;">⚠ ${escapeHtml(w)}</p>`).join('')}
+      <p class="muted-sm">Δεν έχει γραφτεί τίποτα — η εφαρμογή της αλλαγής θα προστεθεί στο επόμενο βήμα.</p>`;
+  } catch (e) {
+    out.innerHTML = `<p style="color:var(--danger);">${escapeHtml(e.message)}</p>`;
+  } finally {
+    unlock();
+  }
+});
+
 // ── ΑΡΧΕΙΑ PDF: ορφανά / χαμένα / ίδιο PDF σε πολλά τιμολόγια ────────────────
 function pdfInvoiceLabel(inv) {
   return `#${inv.id} · ${escapeHtml(fmtDate(inv.doc_date))} · ${escapeHtml(inv.supplier_name || '—')} · ${escapeHtml(inv.doc_number || '—')}`;
