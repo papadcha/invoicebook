@@ -146,6 +146,7 @@ const ALLOWED_PYTHON_COMMANDS = new Set([
   'apply_description_change', 'list_description_changes', 'undo_description_change',
   'preview_description_rule', 'apply_description_rule', 'list_description_rules',
   'add_description_rule', 'set_description_rule_active', 'delete_description_rule',
+  'delete_description_change', 'purge_description_changes',
   'get_machine_merge_candidates', 'get_machine_merge_preview', 'merge_machines',
   'get_orphan_machines', 'delete_orphan_machines', 'get_single_supplier_plate_machines',
   'get_unit_variants', 'merge_units',

@@ -13,7 +13,7 @@ import shutil
 import unicodedata
 import hashlib
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 DB_NAME = None       # ορίζεται από bridge.py
 PDF_STORE_DIR = None  # ορίζεται από bridge.py — φάκελος όπου "υιοθετούνται" τα PDF
@@ -610,6 +610,48 @@ def list_description_changes(limit=20):
                 'old_group_count': len(olds),
             })
         return out
+
+
+def delete_description_change(change_id):
+    """Σβήνει ΜΙΑ αλλαγή από το ιστορικό (και τις εγγραφές αναίρεσής της, ON DELETE CASCADE). Δεν αγγίζει τα
+    δεδομένα των γραμμών -- μόνο χάνεται η δυνατότητα αναίρεσης αυτής της αλλαγής."""
+    with get_db() as conn:
+        ch = conn.execute('SELECT id, undone_at FROM tbl_description_changes WHERE id = ?', (change_id,)).fetchone()
+        if not ch:
+            raise ValueError('Η αλλαγή δεν βρέθηκε')
+        n = conn.execute('SELECT COUNT(*) AS n FROM tbl_description_change_items WHERE change_id = ?', (change_id,)).fetchone()['n']
+        conn.execute('DELETE FROM tbl_description_changes WHERE id = ?', (change_id,))
+    return {'deleted_changes': 1, 'deleted_items': n, 'was_undone': bool(ch['undone_at'])}
+
+
+def purge_description_changes(only_undone=False, older_than_days=None, dry_run=False):
+    """Μαζική εκκαθάριση ιστορικού -- ΜΟΝΟ όταν την ζητήσει ο χρήστης (καμία αυτόματη διαγραφή). Σβήνει τις αλλαγές που
+    ταιριάζουν σε ΟΠΟΙΟΔΗΠΟΤΕ από τα κριτήρια: «αναιρεμένες» ή «παλιότερες από Ν ημέρες». dry_run: μόνο μετράει.
+    Δεν αγγίζει τα δεδομένα των γραμμών· χάνεται η δυνατότητα αναίρεσης των αλλαγών που σβήνονται."""
+    conds, params = [], []
+    if only_undone:
+        conds.append('undone_at IS NOT NULL')
+    if older_than_days not in (None, ''):
+        try:
+            days = int(older_than_days)
+        except (TypeError, ValueError):
+            raise ValueError('Οι ημέρες πρέπει να είναι ακέραιος αριθμός')
+        if days < 1:
+            raise ValueError('Οι ημέρες πρέπει να είναι τουλάχιστον 1')
+        conds.append('created_at < ?')
+        params.append((datetime.now(timezone.utc) - timedelta(days=days)).isoformat())
+    if not conds:
+        raise ValueError('Διάλεξε κριτήριο: αναιρεμένες ή παλιότερες από Ν ημέρες')
+    where = ' OR '.join(conds)
+    with get_db() as conn:
+        ids = [r['id'] for r in conn.execute(f'SELECT id FROM tbl_description_changes WHERE {where}', params)]
+        items = 0
+        if ids:
+            marks = ','.join('?' * len(ids))
+            items = conn.execute(f'SELECT COUNT(*) AS n FROM tbl_description_change_items WHERE change_id IN ({marks})', ids).fetchone()['n']
+            if not dry_run:
+                conn.execute(f'DELETE FROM tbl_description_changes WHERE id IN ({marks})', ids)
+    return {'changes': len(ids), 'items': items, 'dry_run': bool(dry_run)}
 
 
 def undo_description_change(change_id):

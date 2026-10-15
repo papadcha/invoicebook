@@ -277,6 +277,13 @@ def handle(cmd, payload):
     if cmd == 'list_description_changes':
         return database.list_description_changes()
 
+    if cmd == 'delete_description_change':
+        return database.delete_description_change(_int_id(payload, 'change_id'))
+
+    if cmd == 'purge_description_changes':
+        return database.purge_description_changes(
+            bool(payload.get('only_undone')), payload.get('older_than_days'), bool(payload.get('dry_run')))
+
     if cmd == 'undo_description_change':
         return database.undo_description_change(_int_id(payload, 'change_id'))
 

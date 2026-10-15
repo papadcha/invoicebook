@@ -171,7 +171,13 @@
   <div class="card">
     <div class="card-title">Ιστορικό αλλαγών περιγραφών</div>
     <p class="muted-sm" style="margin-bottom:10px;">Η αναίρεση επαναφέρει μόνο γραμμές που δεν έχουν αλλάξει από τότε (νεότερη αλλαγή ή χειροκίνητη διόρθωση).
-      Η παλιά «Συγχώνευση όλων» των υποψηφίων ομαδοποιήσεων παρακάτω δεν καταγράφεται εδώ.</p>
+      Η παλιά «Συγχώνευση όλων» των υποψηφίων ομαδοποιήσεων παρακάτω δεν καταγράφεται εδώ.
+      Το ιστορικό <b>δεν καθαρίζεται αυτόματα</b> — σβήνεται μόνο όταν το ζητήσεις εσύ (παρακάτω ή ανά γραμμή). Η διαγραφή χάνει την αναίρεση, όχι τις αλλαγές.</p>
+    <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+      <label><input type="checkbox" id="desc-purge-undone" style="width:auto; display:inline-block; margin:0 6px 0 0; vertical-align:middle;"> Οι αναιρεμένες</label>
+      <label>Παλιότερες από <input type="number" id="desc-purge-days" min="1" placeholder="Ν" style="width:70px; display:inline-block;"> ημέρες</label>
+      <button type="button" class="btn btn-outline btn-sm" id="desc-purge-btn">Εκκαθάριση ιστορικού…</button>
+    </div>
     <div id="desc-changes-list"></div>
   </div>
 

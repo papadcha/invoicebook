@@ -760,6 +760,28 @@ document.getElementById('desc-rules-list').addEventListener('click', async e => 
 });
 
 // ── ΙΣΤΟΡΙΚΟ ΑΛΛΑΓΩΝ ΠΕΡΙΓΡΑΦΩΝ (με αναίρεση) ───────────────────────────────
+// Μαζική εκκαθάριση: ΜΟΝΟ όταν την ζητήσει ο χρήστης (καμία αυτόματη διαγραφή). Πρώτα μέτρημα (dry_run), μετά επιβεβαίωση.
+document.getElementById('desc-purge-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('desc-purge-btn');
+  const onlyUndone = document.getElementById('desc-purge-undone').checked;
+  const days = document.getElementById('desc-purge-days').value.trim();
+  if (!onlyUndone && !days) { App.toast('Διάλεξε «αναιρεμένες» ή δώσε ημέρες', 'warn'); return; }
+  const unlock = _lock(btn);
+  try {
+    const args = { only_undone: onlyUndone, older_than_days: days ? parseInt(days, 10) : null };
+    const pre = await pyCallStrict('purge_description_changes', { ...args, dry_run: true });
+    if (!pre.changes) { App.toast('Καμία αλλαγή δεν ταιριάζει στα κριτήρια', 'warn'); return; }
+    if (!await App.confirmAsync(`Να σβηστ${pre.changes === 1 ? 'εί 1 αλλαγή' : `ούν ${pre.changes} αλλαγές`} από το ιστορικό (${pre.items} εγγραφές γραμμών); Οι αλλαγές στα τιμολόγια ΜΕΝΟΥΝ, αλλά δεν θα μπορείς ${pre.changes === 1 ? 'να την αναιρέσεις' : 'να τις αναιρέσεις'}.`)) return;
+    const res = await pyCallStrict('purge_description_changes', args);
+    App.toast(`Σβήστηκαν ${res.changes} αλλαγές από το ιστορικό`, 'ok');
+    loadDescriptionChanges();
+  } catch (err) {
+    App.toast(err.message, 'fail');
+  } finally {
+    unlock();
+  }
+});
+
 async function loadDescriptionChanges() {
   const el = document.getElementById('desc-changes-list');
   const changes = await pyCall('list_description_changes') || [];
@@ -774,11 +796,24 @@ async function loadDescriptionChanges() {
         <td class="muted-sm">${c.line_count}</td>
         <td style="white-space:nowrap;">${c.undone_at
           ? `<span class="muted-sm">αναιρέθηκε ${escapeHtml(fmtDateTime(c.undone_at))}</span>`
-          : `<button type="button" class="btn btn-outline btn-sm" data-desc-undo="${c.id}">Αναίρεση</button>`}</td>
+          : `<button type="button" class="btn btn-outline btn-sm" data-desc-undo="${c.id}">Αναίρεση</button>`}
+          <button type="button" class="btn btn-outline btn-sm" data-desc-del="${c.id}" data-undone="${c.undone_at ? 1 : 0}" title="Διαγραφή από το ιστορικό (χάνεται η δυνατότητα αναίρεσης)">Διαγραφή</button></td>
       </tr>`).join('')}</tbody></table></div>`;
 }
 
 document.getElementById('desc-changes-list').addEventListener('click', async e => {
+  const del = e.target.closest('[data-desc-del]');
+  if (del) {
+    const undone = del.dataset.undone === '1';
+    if (!await App.confirmAsync(undone
+      ? 'Να διαγραφεί αυτή η (ήδη αναιρεμένη) εγγραφή από το ιστορικό;'
+      : 'Να διαγραφεί αυτή η αλλαγή από το ιστορικό; Οι αλλαγές στα τιμολόγια ΜΕΝΟΥΝ, αλλά δεν θα μπορείς πια να την αναιρέσεις.')) return;
+    try {
+      await pyCallStrict('delete_description_change', { change_id: parseInt(del.dataset.descDel, 10) });
+      loadDescriptionChanges();
+    } catch (err) { App.toast(err.message, 'fail'); }
+    return;
+  }
   const btn = e.target.closest('[data-desc-undo]');
   if (!btn) return;
   if (!await App.confirmAsync('Να αναιρεθεί αυτή η αλλαγή περιγραφών; Επαναφέρονται μόνο οι γραμμές που δεν έχουν αλλάξει από τότε.')) return;
