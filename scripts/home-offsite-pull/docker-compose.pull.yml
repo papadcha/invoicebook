@@ -1,0 +1,33 @@
+# Container που «τραβάει» το backup του InvoiceBook στο UGREEN, μία φορά τη νύχτα (βλ. README.md).
+# UGOS → Docker → Project → Create → επικόλληση → Deploy (ΜΕΤΑ το Tailscale και τα αρχεία του README, βήματα 1–4).
+#
+# network_mode: host — ώστε να βλέπει το δίκτυο του Tailscale (διευθύνσεις 100.x.y.z) που ανοίγει το container tailscale.
+# Δεν περιέχει κωδικούς: το rclone.conf και το ssh key ζουν ΜΟΝΟ στο UGREEN, στον φάκελο /volume1/docker/invoicebook-pull/config.
+
+services:
+  invoicebook-pull:
+    image: rclone/rclone:latest
+    container_name: invoicebook-pull
+    network_mode: host
+    entrypoint: ["/bin/sh", "/scripts/loop.sh"]
+    environment:
+      # Ελλάδα (το image δεν έχει tzdata, γι' αυτό POSIX μορφή). Άλλαξε RUN_HOUR αν θέλεις άλλη ώρα.
+      - TZ=EET-2EEST,M3.5.0/3,M10.5.0/4
+      - RUN_HOUR=03
+      - RUN_ON_START=1
+      - RCLONE_CONFIG=/config/rclone.conf
+      # ΔΡΟΜΟΣ Β (Synology μέσω Tailscale) — το remote «synology» ορίζεται στο rclone.conf (βλ. rclone.conf.example)
+      - SRC_REMOTE=synology:
+      - SRC_PATH=/volume1/ds218/Projects/Invoicebook/backup
+      # ΔΡΟΜΟΣ Α (από cloud, χωρίς Tailscale) — ξεσχολίασε αυτά και σχολίασε τα δύο παραπάνω:
+      # - SRC_REMOTE=pcloud:
+      # - SRC_PATH=invoicebook-backup
+      - DST_DIR=/data/invoicebook-backup
+      - STATUS_DIR=/data/_status
+      # Προαιρετικά: όριο ταχύτητας ώστε να μη «φάει» τη γραμμή του γραφείου την ημέρα, π.χ. 8M
+      # - BWLIMIT=8M
+    volumes:
+      - /volume1/docker/invoicebook-pull/config:/config
+      - /volume1/docker/invoicebook-pull/scripts:/scripts:ro
+      - /volume1/backup-invoicebook:/data
+    restart: unless-stopped

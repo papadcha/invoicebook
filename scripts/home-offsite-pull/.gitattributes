@@ -1,0 +1,4 @@
+# Τα scripts τρέχουν σε Alpine/busybox μέσα στο UGREEN: με CRLF (το προεπιλεγμένο των Windows) αποτυγχάνουν («sh\r»).
+*.sh text eol=lf
+*.yml text eol=lf
+*.example text eol=lf

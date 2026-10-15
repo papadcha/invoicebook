@@ -1,0 +1,25 @@
+# Παράδειγμα rclone.conf για το UGREEN — ΑΝΤΙΓΡΑΨΕ ως /volume1/docker/invoicebook-pull/config/rclone.conf και συμπλήρωσε.
+# Το πραγματικό αρχείο ΜΕΝΕΙ ΜΟΝΟ στο UGREEN (δεν μπαίνει στο git, δεν στέλνεται σε mail ή στον Claude).
+
+# ── ΔΡΟΜΟΣ Β: Synology μέσω Tailscale (SFTP) ──────────────────────────────────────────────
+[synology]
+type = sftp
+# Διεύθυνση Tailscale του Synology (sudo tailscale status στο Synology) — ΟΧΙ όνομα, γιατί το UGREEN δεν λύνει MagicDNS
+host = 100.X.Y.Z
+user = pull-backup
+port = 22
+# Κλειδί SSH που φτιάχνεις στο UGREEN (README, βήμα 2): ssh-keygen -t ed25519 -f /volume1/docker/invoicebook-pull/config/id_ed25519
+key_file = /config/id_ed25519
+# Να μη ζητά ποτέ κωδικό (μόνο κλειδί)
+ask_password = false
+# Το Synology (DS218) είναι αργός επεξεργαστής — κράτα λίγες ταυτόχρονες συνδέσεις
+concurrency = 2
+
+# ── ΔΡΟΜΟΣ Α: από cloud (χωρίς Tailscale) — αντίγραψε τα remotes από το rclone.conf του υπολογιστή του γραφείου ──
+# (δες README· ΜΗΝ τα στείλεις μέσω mail/chat — μεταφορά με USB ή απευθείας στο UGREEN)
+# [pcloud]
+# type = pcloud
+# ...
+# [mega]
+# type = mega
+# ...

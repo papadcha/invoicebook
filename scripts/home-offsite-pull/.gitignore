@@ -1,0 +1,9 @@
+# Ό,τι περιέχει κωδικούς/κλειδιά ΔΕΝ μπαίνει ποτέ στο git. Τα πραγματικά αρχεία ζουν μόνο στο UGREEN.
+rclone.conf
+.env
+*.key
+id_ed25519
+id_ed25519.pub
+id_rsa
+id_rsa.pub
+*.pem

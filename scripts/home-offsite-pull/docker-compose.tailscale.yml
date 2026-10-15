@@ -1,0 +1,35 @@
+# Tailscale στο UGREEN NAS (UGOS) — όπως στον οδηγό της UGREEN:
+#   https://support.ugnas.com/detail/article/en-US/622
+#   https://ai.ugreen.com/blogs/how-to/ugreen-nas-remote-access
+# Χρήση: UGOS → Docker → Project → Create → επικόλληση αυτού του αρχείου → βάλε ΤΟ ΔΙΚΟ ΣΟΥ auth key → Deploy.
+#
+# ΠΡΟΣΟΧΗ — το auth key είναι ΚΩΔΙΚΟΣ:
+#   - το δημιουργείς στο Tailscale admin console (λογαριασμός latomeiagalatistas): Settings → Keys → Generate auth key
+#     (φαίνεται ΜΙΑ φορά)· το βάζεις εσύ στη θέση του placeholder, ΜΟΝΟ στο UGREEN.
+#   - ΜΗΝ το κάνεις commit στο git, ΜΗΝ το στέλνεις σε mail ή στον Claude.
+# Μετά το Deploy: στο admin console βρες τη συσκευή «ugreen-nas» και ΑΠΕΝΕΡΓΟΠΟΙΗΣΕ το key expiry (αλλιώς κάθε ~180
+# ημέρες ζητά νέα σύνδεση και το backup σταματά σιωπηλά).
+# Πριν το Deploy φτιάξε τον φάκελο /volume1/docker/tailscale/state στο UGREEN.
+#
+# Σημείωση: --accept-dns=false → το UGREEN ΔΕΝ λύνει ονόματα MagicDNS· για το Synology χρησιμοποίησε τη διεύθυνση
+# 100.x.y.z (sudo tailscale status στο Synology, ή στο admin console).
+
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    hostname: ugreen-nas
+    network_mode: host
+    environment:
+      - TS_AUTHKEY=tskey-auth-ΒΑΛΕ-ΕΔΩ-ΤΟ-ΔΙΚΟ-ΣΟΥ-ΚΛΕΙΔΙ
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      - TS_EXTRA_ARGS=--accept-dns=false
+    volumes:
+      - /volume1/docker/tailscale/state:/var/lib/tailscale
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - net_admin
+      - net_raw
+    restart: unless-stopped
