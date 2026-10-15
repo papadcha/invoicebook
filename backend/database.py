@@ -22,7 +22,7 @@ _local_db_dir = os.path.dirname(os.path.abspath(__file__ + '/../database'))
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database', 'schema.sql')
 MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'database')
 
-CURRENT_SCHEMA_VERSION = 8
+CURRENT_SCHEMA_VERSION = 10
 
 migration_files = {
     1: os.path.join(MIGRATIONS_DIR, 'migration_001_initial_schema.sql'),
@@ -33,6 +33,8 @@ migration_files = {
     6: os.path.join(MIGRATIONS_DIR, 'migration_006_invoice_exports.sql'),
     7: os.path.join(MIGRATIONS_DIR, 'migration_007_invoice_ref_docs.sql'),
     8: os.path.join(MIGRATIONS_DIR, 'migration_008_export_receipts.sql'),
+    9: os.path.join(MIGRATIONS_DIR, 'migration_009_description_changes.sql'),
+    10: os.path.join(MIGRATIONS_DIR, 'migration_010_description_rules.sql'),
 }
 
 
@@ -545,6 +547,241 @@ def preview_description_change(items, new_description=None, new_category=None):
         'current_categories': sorted(categories, key=lambda c: (c is None, c or '')),
         'new_description': new_description, 'new_category': new_category,
     }
+
+
+def apply_description_change(items, new_description=None, new_category=None, expected_lines=None):
+    """Εφαρμόζει νέα περιγραφή και/ή κατηγορία στις επιλεγμένες ομάδες (category, description)
+    -- σε ΜΙΑ συναλλαγή, καταγράφοντας ανά γραμμή την παλιά τιμή (tbl_description_change_items) ώστε
+    να αναιρείται (undo_description_change). Ομάδες που ήδη έχουν την τιμή-στόχο δεν αγγίζονται.
+    expected_lines: ο αριθμός γραμμών της προεπισκόπησης· αν τα δεδομένα άλλαξαν στο μεταξύ,
+    αρνείται (ξανακάνε προεπισκόπηση) αντί να αλλάξει κάτι που ο χρήστης δεν είδε.
+    Όπως και η παλιά ενοποίηση, δεν πειράζει updated_at τιμολογίου (αλλάζει μόνο κείμενο γραμμής)."""
+    new_description = (new_description or '').strip() or None
+    new_category = (new_category or '').strip() or None
+    if not items:
+        raise ValueError('Δεν επιλέχθηκε καμία περιγραφή')
+    if new_description is None and new_category is None:
+        raise ValueError('Δώσε νέα περιγραφή ή νέα κατηγορία')
+
+    with get_db() as conn:
+        rows = []  # (item_id, invoice_id, old_description, old_category)
+        for it in items:
+            cat, desc = it.get('category') or None, it.get('description')
+            if (new_description is None or desc == new_description) and (new_category is None or cat == new_category):
+                continue  # ήδη στην τιμή-στόχο
+            rows += [(r['id'], r['invoice_id'], desc, cat) for r in conn.execute(
+                'SELECT id, invoice_id FROM tbl_invoice_items WHERE category IS ? AND description = ?', (cat, desc))]
+        if not rows:
+            raise ValueError('Δεν υπάρχει τίποτα προς αλλαγή (όλες οι επιλεγμένες έχουν ήδη την τιμή-στόχο ή δεν βρέθηκαν γραμμές)')
+        if expected_lines is not None and len(rows) != expected_lines:
+            raise ValueError(
+                f'Τα δεδομένα άλλαξαν από την προεπισκόπηση (περίμενα {expected_lines} γραμμές, βρέθηκαν {len(rows)}) — '
+                'κάνε ξανά προεπισκόπηση.')
+
+        cur = conn.execute(
+            'INSERT INTO tbl_description_changes (created_at, new_description, new_category, line_count) VALUES (?, ?, ?, ?)',
+            (_now(), new_description, new_category, len(rows)))
+        change_id = cur.lastrowid
+        conn.executemany(
+            'INSERT INTO tbl_description_change_items (change_id, item_id, old_description, old_category) VALUES (?, ?, ?, ?)',
+            [(change_id, item_id, old_desc, old_cat) for item_id, _, old_desc, old_cat in rows])
+        for item_id, _, old_desc, old_cat in rows:
+            conn.execute('UPDATE tbl_invoice_items SET description = ?, category = ? WHERE id = ?',
+                         (new_description or old_desc, new_category or old_cat, item_id))
+    return {'change_id': change_id, 'updated_rows': len(rows),
+            'updated_invoices': len({inv for _, inv, _, _ in rows})}
+
+
+def list_description_changes(limit=20):
+    """Οι πιο πρόσφατες αλλαγές περιγραφών (νεότερη πρώτα), με δείγμα των παλιών τιμών."""
+    with get_db() as conn:
+        out = []
+        for c in conn.execute('SELECT * FROM tbl_description_changes ORDER BY id DESC LIMIT ?', (limit,)).fetchall():
+            olds = conn.execute(
+                '''SELECT old_category, old_description, new_description, COUNT(*) AS n FROM tbl_description_change_items
+                   WHERE change_id = ? GROUP BY old_category, old_description, new_description ORDER BY n DESC''',
+                (c['id'],)).fetchall()
+            out.append({
+                'id': c['id'], 'created_at': c['created_at'], 'new_description': c['new_description'],
+                'new_category': c['new_category'], 'line_count': c['line_count'], 'undone_at': c['undone_at'],
+                'note': c['note'],
+                'old_groups': [{'category': o['old_category'], 'description': o['old_description'],
+                                'new_description': o['new_description'], 'count': o['n']} for o in olds[:5]],
+                'old_group_count': len(olds),
+            })
+        return out
+
+
+def undo_description_change(change_id):
+    """Αναιρεί μια αλλαγή περιγραφής. Ασφαλής: επαναφέρει μόνο γραμμές που ΕΞΑΚΟΛΟΥΘΟΥΝ να έχουν
+    ακριβώς την τιμή που έβαλε η αλλαγή· αν η γραμμή άλλαξε από τότε (π.χ. νεότερη αλλαγή ή χειροκίνητη
+    διόρθωση) δεν την πειράζει, και αν χάθηκε (σβήστηκε/ξαναγράφτηκε το τιμολόγιο) την αναφέρει."""
+    with get_db() as conn:
+        ch = conn.execute('SELECT * FROM tbl_description_changes WHERE id = ?', (change_id,)).fetchone()
+        if not ch:
+            raise ValueError('Η αλλαγή δεν βρέθηκε')
+        if ch['undone_at']:
+            raise ValueError('Η αλλαγή έχει ήδη αναιρεθεί')
+        reverted = changed_since = 0
+        for it in conn.execute('SELECT * FROM tbl_description_change_items WHERE change_id = ?', (change_id,)).fetchall():
+            cur = conn.execute('SELECT description, category FROM tbl_invoice_items WHERE id = ?', (it['item_id'],)).fetchone()
+            if not cur:
+                continue  # δεν θα έφτανε εδώ λόγω CASCADE, αλλά ας μην σπάσει αν τα FK είναι κλειστά
+            # νέα τιμή ανά γραμμή (κανόνας αντικατάστασης, migration 010) αλλιώς της αλλαγής (009)
+            applied_desc = it['new_description'] or ch['new_description'] or it['old_description']
+            applied_cat = it['new_category'] or ch['new_category'] or it['old_category']
+            if cur['description'] != applied_desc or cur['category'] != applied_cat:
+                changed_since += 1
+                continue
+            conn.execute('UPDATE tbl_invoice_items SET description = ?, category = ? WHERE id = ?',
+                         (it['old_description'], it['old_category'], it['item_id']))
+            reverted += 1
+        conn.execute('UPDATE tbl_description_changes SET undone_at = ? WHERE id = ?', (_now(), change_id))
+        missing = ch['line_count'] - reverted - changed_since
+    return {'reverted': reverted, 'changed_since': changed_since, 'missing': max(missing, 0)}
+
+
+# ── ΚΑΝΟΝΕΣ ΑΝΤΙΚΑΤΑΣΤΑΣΗΣ ΠΕΡΙΓΡΑΦΩΝ (regex) ─────────────────────────────────
+# Ένας κανόνας = Python re.sub(pattern, replacement) πάνω στην περιγραφή. Χρησιμοποιείται (α) μία φορά πάνω
+# σε επιλεγμένες περιγραφές (καθαρισμός, με προεπισκόπηση «παλιά → νέα» και αναίρεση) και (β) ως ΜΟΝΙΜΟΣ κανόνας
+# (tbl_description_rules) σε κάθε νέα καταχώριση γραμμής, ώστε το πρότυπο (π.χ. «ΒΙΔΕΣ ΑΤΣ. ΕΞ.») να κρατιέται.
+
+def _compile_rule(pattern):
+    if not (pattern or '').strip():
+        raise ValueError('Δώσε μοτίβο (regex)')
+    try:
+        return re.compile(pattern)
+    except re.error as e:
+        raise ValueError(f'Μη έγκυρο μοτίβο (regex): {e}')
+
+
+def _apply_description_rules(conn, description):
+    """Εφαρμόζει τους ενεργούς μόνιμους κανόνες με τη σειρά id. Ανθεκτικό: ένας χαλασμένος κανόνας
+    προσπερνιέται (δεν σπάει την καταχώριση)· ο πίνακας μπορεί να λείπει σε βάση που δεν έχει περάσει migration."""
+    try:
+        rules = conn.execute('SELECT pattern, replacement FROM tbl_description_rules WHERE active = 1 ORDER BY id').fetchall()
+    except sqlite3.OperationalError:
+        return description
+    for r in rules:
+        try:
+            description = re.sub(r['pattern'], r['replacement'], description)
+        except (re.error, IndexError):
+            continue
+    return description
+
+
+def _all_description_groups(conn):
+    """Όλα τα διακριτά (category, description) της βάσης -- για κανόνα «σε όλη τη βάση» (scope_all)."""
+    return [{'category': r['category'], 'description': r['description']} for r in conn.execute(
+        "SELECT DISTINCT category, description FROM tbl_invoice_items WHERE description IS NOT NULL AND description != ''")]
+
+
+def _rule_changes(conn, items, pattern, replacement):
+    """[(category, old, new, [(item_id, invoice_id)])] μόνο για περιγραφές που ΑΛΛΑΖΟΥΝ."""
+    rx = _compile_rule(pattern)
+    out = []
+    for it in items:
+        cat, desc = it.get('category') or None, it.get('description')
+        if not desc:
+            continue
+        try:
+            new = rx.sub(replacement or '', desc)
+        except (re.error, IndexError) as e:
+            raise ValueError(f'Μη έγκυρη αντικατάσταση: {e}')
+        if new == desc or not new.strip():
+            continue
+        rows = [(r['id'], r['invoice_id']) for r in conn.execute(
+            'SELECT id, invoice_id FROM tbl_invoice_items WHERE category IS ? AND description = ?', (cat, desc))]
+        out.append((cat, desc, new, rows))
+    return out
+
+
+def preview_description_rule(items, pattern, replacement, scope_all=False):
+    """Προεπισκόπηση (ΜΟΝΟ ανάγνωση) κανόνα: λίστα «παλιά → νέα» ανά περιγραφή που αλλάζει, και αν η νέα
+    περιγραφή υπάρχει ήδη στην ίδια κατηγορία (τότε οι γραμμές ενώνονται με υπάρχουσα).
+    scope_all: ο κανόνας εφαρμόζεται σε ΟΛΕΣ τις περιγραφές της βάσης (αγνοεί τα items)."""
+    if not items and not scope_all:
+        raise ValueError('Δεν επιλέχθηκε καμία περιγραφή')
+    with get_db() as conn:
+        if scope_all:
+            items = _all_description_groups(conn)
+        changes = _rule_changes(conn, items, pattern, replacement)
+        listing, lines, invoices = [], 0, set()
+        for cat, old, new, rows in changes:
+            existing = conn.execute(
+                'SELECT COUNT(*) AS n FROM tbl_invoice_items WHERE category IS ? AND description = ?', (cat, new)).fetchone()['n']
+            lines += len(rows)
+            invoices.update(inv for _, inv in rows)
+            listing.append({'category': cat, 'old': old, 'new': new, 'line_count': len(rows), 'merges_into_existing': existing})
+    return {'selected_groups': len(items), 'groups_to_change': len(changes), 'lines_to_change': lines,
+            'invoices_to_change': len(invoices), 'unchanged_groups': len(items) - len(changes),
+            'changes': listing[:500], 'truncated': len(listing) > 500}
+
+
+def apply_description_rule(items, pattern, replacement, expected_lines=None, save_rule_name=None, scope_all=False):
+    """Εφαρμόζει τον κανόνα στις επιλεγμένες περιγραφές -- σε ΜΙΑ συναλλαγή, με καταγραφή της παλιάς ΚΑΙ της
+    νέας τιμής ανά γραμμή (αναίρεση όπως η apply_description_change). save_rule_name: αποθήκευση και ως
+    ΜΟΝΙΜΟΣ κανόνας για νέες καταχωρήσεις (tbl_description_rules). scope_all: σε ΟΛΕΣ τις περιγραφές της βάσης."""
+    if not items and not scope_all:
+        raise ValueError('Δεν επιλέχθηκε καμία περιγραφή')
+    with get_db() as conn:
+        if scope_all:
+            items = _all_description_groups(conn)
+        changes = _rule_changes(conn, items, pattern, replacement)
+        total = sum(len(rows) for _, _, _, rows in changes)
+        if total == 0:
+            raise ValueError('Ο κανόνας δεν αλλάζει καμία από τις επιλεγμένες περιγραφές')
+        if expected_lines is not None and total != expected_lines:
+            raise ValueError(f'Τα δεδομένα άλλαξαν από την προεπισκόπηση (περίμενα {expected_lines} γραμμές, '
+                             f'βρέθηκαν {total}) — κάνε ξανά προεπισκόπηση.')
+        cur = conn.execute(
+            'INSERT INTO tbl_description_changes (created_at, new_description, new_category, line_count, note) '
+            'VALUES (?, NULL, NULL, ?, ?)', (_now(), total, f'Κανόνας: {pattern}  →  {replacement}'))
+        change_id = cur.lastrowid
+        invoices = set()
+        for cat, old, new, rows in changes:
+            for item_id, inv in rows:
+                conn.execute(
+                    'INSERT INTO tbl_description_change_items (change_id, item_id, old_description, old_category, new_description) '
+                    'VALUES (?, ?, ?, ?, ?)', (change_id, item_id, old, cat, new))
+                conn.execute('UPDATE tbl_invoice_items SET description = ? WHERE id = ?', (new, item_id))
+                invoices.add(inv)
+        rule_id = None
+        if save_rule_name and save_rule_name.strip():
+            rule_id = conn.execute(
+                'INSERT INTO tbl_description_rules (name, pattern, replacement, created_at) VALUES (?, ?, ?, ?)',
+                (save_rule_name.strip(), pattern, replacement or '', _now())).lastrowid
+    return {'change_id': change_id, 'updated_rows': total, 'updated_groups': len(changes),
+            'updated_invoices': len(invoices), 'saved_rule_id': rule_id}
+
+
+def list_description_rules():
+    with get_db() as conn:
+        return [dict(r) for r in conn.execute('SELECT * FROM tbl_description_rules ORDER BY id').fetchall()]
+
+
+def add_description_rule(name, pattern, replacement):
+    _compile_rule(pattern)
+    if not (name or '').strip():
+        raise ValueError('Δώσε όνομα κανόνα')
+    with get_db() as conn:
+        return {'id': conn.execute(
+            'INSERT INTO tbl_description_rules (name, pattern, replacement, created_at) VALUES (?, ?, ?, ?)',
+            (name.strip(), pattern, replacement or '', _now())).lastrowid}
+
+
+def set_description_rule_active(rule_id, active):
+    with get_db() as conn:
+        cur = conn.execute('UPDATE tbl_description_rules SET active = ? WHERE id = ?', (1 if active else 0, rule_id))
+        if not cur.rowcount:
+            raise ValueError('Ο κανόνας δεν βρέθηκε')
+
+
+def delete_description_rule(rule_id):
+    with get_db() as conn:
+        cur = conn.execute('DELETE FROM tbl_description_rules WHERE id = ?', (rule_id,))
+        if not cur.rowcount:
+            raise ValueError('Ο κανόνας δεν βρέθηκε')
 
 
 # ── ΤΙΜΟΛΟΓΙΑ ─────────────────────────────────────────────────────────────────
@@ -1737,8 +1974,14 @@ def _resolve_items(conn, items):
         r = dict(it)
         if 'machine_name' in r:
             r['machine_id'] = _find_or_create_machine(conn, r.get('machine_name'))
+        if r.get('description'):
+            # μόνιμοι κανόνες περιγραφής (tbl_description_rules) ΠΡΙΝ την αντιστοίχιση με υπάρχουσα περιγραφή
+            r['description'] = _apply_description_rules(conn, r['description'])
         if r.get('description') and r.get('category'):
             r['description'] = _canonicalize_description(conn, r['category'], r['description'])
+            # ξανά μετά την αντιστοίχιση: αν η υπάρχουσα περιγραφή που ταίριαξε έχει ακόμα το ΠΑΛΙΟ πρόθεμα
+            # (δεν έχει περάσει ο κανόνας από τα παλιά δεδομένα), να μη «διαρρεύσει» στη νέα εγγραφή
+            r['description'] = _apply_description_rules(conn, r['description'])
         resolved.append(r)
     return resolved
 

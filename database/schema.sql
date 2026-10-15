@@ -118,6 +118,40 @@ CREATE TABLE tbl_dismissed_merge_candidates (
   UNIQUE(kind, candidate_key)
 );
 
+-- Καταγραφή αλλαγών περιγραφής/κατηγορίας γραμμών (καθαρισμός περιγραφών) με αναίρεση —
+-- βλ. migration_009_description_changes.sql.
+CREATE TABLE tbl_description_changes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at TEXT NOT NULL,
+  new_description TEXT,
+  new_category TEXT,
+  line_count INTEGER NOT NULL,
+  undone_at TEXT,
+  note TEXT                -- migration 010
+);
+
+CREATE TABLE tbl_description_change_items (
+  change_id INTEGER NOT NULL REFERENCES tbl_description_changes(id) ON DELETE CASCADE,
+  item_id INTEGER NOT NULL REFERENCES tbl_invoice_items(id) ON DELETE CASCADE,
+  old_description TEXT,
+  old_category TEXT,
+  new_description TEXT,    -- migration 010: νέα τιμή ΑΝΑ ΓΡΑΜΜΗ (κανόνας αντικατάστασης)· NULL = της αλλαγής
+  new_category TEXT,
+  PRIMARY KEY (change_id, item_id)
+);
+
+CREATE INDEX idx_description_change_items_item ON tbl_description_change_items(item_id);
+
+-- Μόνιμοι κανόνες περιγραφής (regex) που τρέχουν σε κάθε νέα καταχώριση γραμμής — βλ. migration_010_description_rules.sql.
+CREATE TABLE tbl_description_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  pattern TEXT NOT NULL,
+  replacement TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1
+);
+
 -- Cache SHA256 ανά αρχείο του pdf_store (Layer 1 dedup: ίδιο ακριβώς PDF σε δύο
 -- τιμολόγια) — βλ. migration_005_pdf_hashes.sql. Καθαρά cache, αναδημιουργείται.
 CREATE TABLE tbl_pdf_hashes (

@@ -1,4 +1,4 @@
-import { escapeHtml, _lock, normalizeGreek, attachAutocomplete, fmtDate } from '../../../js/utils.js';
+import { escapeHtml, _lock, normalizeGreek, attachAutocomplete, fmtDate, fmtDateTime } from '../../../js/utils.js';
 
 // ── SUBTABS ──────────────────────────────────────────────────────────────────
 const loaded = { suppliers: false, machines: false, descriptions: false, units: false, pdfs: false };
@@ -9,7 +9,7 @@ document.querySelectorAll('.subtab[data-subtab]').forEach(btn => btn.addEventLis
   document.querySelectorAll('.subtab-panel').forEach(p => p.style.display = (p.id === `panel-${tab}` ? '' : 'none'));
   if (tab === 'suppliers' && !loaded.suppliers) { loaded.suppliers = true; loadSupplierCandidates(); loadOrphanSuppliers(); loadInvalidVatSuppliers(); }
   if (tab === 'machines' && !loaded.machines) { loaded.machines = true; loadMachineCandidates(); loadOrphanMachines(); loadPlateMachines(); }
-  if (tab === 'descriptions' && !loaded.descriptions) { loaded.descriptions = true; loadDescriptionCandidates(); }
+  if (tab === 'descriptions' && !loaded.descriptions) { loaded.descriptions = true; loadDescriptionCandidates(); loadDescriptionChanges(); loadDescriptionRules(); }
   if (tab === 'units' && !loaded.units) { loaded.units = true; loadUnitVariants(); }
   if (tab === 'pdfs' && !loaded.pdfs) { loaded.pdfs = true; loadPdfReport(); }
 }));
@@ -431,10 +431,14 @@ async function loadDescriptionCandidates() {
 }
 
 // ── ΑΝΑΖΗΤΗΣΗ ΠΕΡΙΓΡΑΦΩΝ (καθαρισμός περιγραφών) ─────────────────────────────
-// Μόνο ανάγνωση + προεπισκόπηση· η εφαρμογή αλλαγής (με αναίρεση) είναι επόμενο βήμα, βλ. TODO.md
+// Αναζήτηση → επιλογή → προεπισκόπηση → εφαρμογή (με καταγραφή και αναίρεση, migration 009), βλ. TODO.md
 // «Διαχείριση περιγραφών». Η επιλογή κρατιέται ανάμεσα σε αναζητήσεις (Map κλειδί → ομάδα), ώστε
 // να μαζευτούν περιγραφές από πολλές αναζητήσεις («παλετ», μετά «παλλετ»…) πριν την προεπισκόπηση.
+// Η εφαρμογή γίνεται ΜΟΝΟ μετά από προεπισκόπηση και στέλνει τον αριθμό γραμμών που είδε ο χρήστης
+// (expected_lines): αν τα δεδομένα άλλαξαν στο μεταξύ, το backend αρνείται.
 const descSelected = new Map();   // key → { category, description }
+let lastDescPreview = null;       // { items, newDescription, newCategory, lines }
+let lastRulePreview = null;       // { items, pattern, replacement, lines, saveName }
 let descGroups = [];              // τα τρέχοντα αποτελέσματα αναζήτησης
 let descSearchSeq = 0;
 let descSearchTimer = null;
@@ -468,7 +472,7 @@ function renderDescResults() {
   const el = document.getElementById('desc-search-results');
   if (!descGroups.length) { el.innerHTML = ''; return; }
   el.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th style="width:32px;"></th><th>Κατηγορία</th><th>Περιγραφή</th><th>Γραμμές / τιμολόγια</th><th>Προμηθευτές</th><th>Τιμή μονάδας</th><th>Ημερομηνίες</th><th></th></tr></thead>
+    <thead><tr><th style="width:32px;"><input type="checkbox" id="desc-select-all" title="Επιλογή / αποεπιλογή όλων των αποτελεσμάτων" ${descGroups.every(g => descSelected.has(descKey(g.category, g.description))) ? 'checked' : ''}></th><th>Κατηγορία</th><th>Περιγραφή</th><th>Γραμμές / τιμολόγια</th><th>Προμηθευτές</th><th>Τιμή μονάδας</th><th>Ημερομηνίες</th><th></th></tr></thead>
     <tbody>${descGroups.map((g, i) => `
       <tr>
         <td><input type="checkbox" data-desc-i="${i}" ${descSelected.has(descKey(g.category, g.description)) ? 'checked' : ''}></td>
@@ -483,10 +487,11 @@ function renderDescResults() {
 }
 
 function updateDescActionBox() {
-  const box = document.getElementById('desc-action-box');
-  box.style.display = descSelected.size ? '' : 'none';
-  document.getElementById('desc-selected-count').textContent = `Επιλεγμένες: ${descSelected.size} περιγραφές`;
+  document.getElementById('desc-selected-count').textContent = `Επιλεγμένες: ${descSelected.size} ${descSelected.size === 1 ? 'περιγραφή' : 'περιγραφές'}`;
   document.getElementById('desc-preview-result').innerHTML = '';
+  document.getElementById('desc-rule-result').innerHTML = '';
+  lastDescPreview = null; // αλλαγή επιλογής ακυρώνει την προεπισκόπηση
+  lastRulePreview = null;
 }
 
 document.getElementById('desc-search-input').addEventListener('input', () => {
@@ -498,6 +503,16 @@ document.getElementById('desc-search-input').addEventListener('keydown', e => {
 });
 
 document.getElementById('desc-search-results').addEventListener('change', e => {
+  if (e.target.id === 'desc-select-all') {
+    for (const g of descGroups) {
+      const key = descKey(g.category, g.description);
+      if (e.target.checked) descSelected.set(key, { category: g.category, description: g.description });
+      else descSelected.delete(key);
+    }
+    renderDescResults();
+    updateDescActionBox();
+    return;
+  }
   const cb = e.target.closest('[data-desc-i]');
   if (!cb) return;
   const g = descGroups[parseInt(cb.dataset.descI, 10)];
@@ -535,20 +550,246 @@ document.getElementById('desc-preview-btn').addEventListener('click', async () =
   const newCategory = document.getElementById('desc-new-category').value.trim();
   if (!newDescription && !newCategory) { out.innerHTML = '<p class="muted-sm">Δώσε νέα περιγραφή ή νέα κατηγορία.</p>'; return; }
   const unlock = _lock(btn);
+  lastDescPreview = null;
   try {
+    const items = [...descSelected.values()];
     const p = await pyCallStrict('preview_description_change', {
-      items: [...descSelected.values()], new_description: newDescription || null, new_category: newCategory || null,
+      items, new_description: newDescription || null, new_category: newCategory || null,
     });
+    if (p.lines_to_change > 0) {
+      lastDescPreview = { items, newDescription: newDescription || null, newCategory: newCategory || null, lines: p.lines_to_change };
+    }
     out.innerHTML = `
       <p>Θα αλλάξ${p.lines_to_change === 1 ? 'ει' : 'ουν'} <b>${p.lines_to_change}</b> γραμμ${p.lines_to_change === 1 ? 'ή' : 'ές'} σε <b>${p.invoices_to_change}</b> τιμολόγι${p.invoices_to_change === 1 ? 'ο' : 'α'}
         <span class="muted-sm">(επιλεγμένες: ${p.selected_groups} περιγραφές, ${p.selected_lines} γραμμές${p.unchanged_groups ? ` · ${p.unchanged_groups} ήδη έχουν την τιμή-στόχο` : ''})</span></p>
       <p class="muted-sm">${p.new_description ? `Νέα περιγραφή: <b>${escapeHtml(p.new_description)}</b>` : 'Η περιγραφή μένει ίδια'} ·
         ${p.new_category ? `Νέα κατηγορία: <b>${escapeHtml(p.new_category)}</b>` : 'η κατηγορία μένει ίδια'}</p>
       ${p.warnings.map(w => `<p style="color:#856404;">⚠ ${escapeHtml(w)}</p>`).join('')}
-      <p class="muted-sm">Δεν έχει γραφτεί τίποτα — η εφαρμογή της αλλαγής θα προστεθεί στο επόμενο βήμα.</p>`;
+      ${lastDescPreview
+        ? '<p class="muted-sm">Δεν έχει γραφτεί τίποτα ακόμα. Η αλλαγή καταγράφεται και αναιρείται από το «Ιστορικό αλλαγών» παρακάτω.</p><div class="form-actions" style="margin-top:8px;"><button type="button" class="btn btn-primary" id="desc-apply-btn">Εφαρμογή</button></div>'
+        : '<p class="muted-sm">Δεν υπάρχει τίποτα προς αλλαγή.</p>'}`;
   } catch (e) {
     out.innerHTML = `<p style="color:var(--danger);">${escapeHtml(e.message)}</p>`;
   } finally {
+    unlock();
+  }
+});
+
+document.getElementById('desc-preview-result').addEventListener('click', async e => {
+  const btn = e.target.closest('#desc-apply-btn');
+  if (!btn || !lastDescPreview) return;
+  const pv = lastDescPreview;
+  const what = [pv.newDescription && `περιγραφή «${pv.newDescription}»`, pv.newCategory && `κατηγορία «${pv.newCategory}»`].filter(Boolean).join(' και ');
+  if (!await App.confirmAsync(`Να αλλάξ${pv.lines === 1 ? 'ει' : 'ουν'} ${pv.lines} γραμμ${pv.lines === 1 ? 'ή τιμολογίου' : 'ές τιμολογίων'} (νέα ${what}); Μπορεί να αναιρεθεί από το Ιστορικό αλλαγών.`)) return;
+  const unlock = _lock(btn);
+  try {
+    const res = await pyCallStrict('apply_description_change', {
+      items: pv.items, new_description: pv.newDescription, new_category: pv.newCategory, expected_lines: pv.lines,
+    });
+    App.toast(`Άλλαξαν ${res.updated_rows} γραμμές σε ${res.updated_invoices} τιμολόγια`, 'ok');
+    descSelected.clear();
+    lastDescPreview = null;
+    document.getElementById('desc-new-description').value = '';
+    document.getElementById('desc-new-category').value = '';
+    updateDescActionBox();
+    window.reloadLookups();
+    loadDescriptionChanges();
+    loadDescriptionCandidates();
+    runDescSearch();
+  } catch (err) {
+    App.toast(err.message, 'fail');
+    unlock();
+  }
+});
+
+// ── ΚΑΝΟΝΑΣ ΑΝΤΙΚΑΤΑΣΤΑΣΗΣ (regex) ──────────────────────────────────────────────
+// Διαφορετικό αποτέλεσμα ανά περιγραφή (μένουν τα μεγέθη, αλλάζει το πρόθεμα) -- η «ενοποίηση» δίνει μία τιμή σε όλες.
+// Προεπισκόπηση «παλιά → νέα» πριν την εφαρμογή· προαιρετικά αποθηκεύεται και ως μόνιμος κανόνας για νέες καταχωρήσεις.
+const RULE_PRESETS = {
+  'screws-prefix': {
+    name: 'Βίδες: πρόθεμα ΑΤΣ. ΕΞ.',
+    pattern: '^ΒΙΔΕΣ\\s*ΑΤΣ\\.?\\s*(?:ΕΞΑΓ|ΕΞΕ|ΕΞ|ΕΕ|Ε)\\.?\\s*(?=\\d)',
+    replacement: 'ΒΙΔΕΣ ΑΤΣ. ΕΞ. ',
+  },
+  'screws-inch': {
+    name: 'Βίδες (ίντσες): κενό μετά το ΑΤΣ.',
+    pattern: '^ΒΙΔΕΣ ΑΤΣ\\.(?=\\d)',
+    replacement: 'ΒΙΔΕΣ ΑΤΣ. ',
+  },
+  // Ενιαίο διαχωριστικό διαστάσεων: ΛΑΤΙΝΙΚΟ κεφαλαίο X (πλειοψηφία στα δεδομένα: 605 περιγραφές έναντι 239 ελληνικό Χ
+  // και 193 μικρό x· σύμβολο διαστάσεων DIN/ISO· ίδιο με τον κατάλογο του ExpVault+). Πιάνει ελληνικό Χ/χ, μικρό x και ×
+  // ΜΟΝΟ ανάμεσα σε αριθμούς (16Χ60, 2 x 10) και κρατά τα κενά γύρω του (\1, \2) -- ελληνικές λέξεις με Χ δεν αγγίζονται.
+  'sizes-x': {
+    name: 'Μεγέθη: ενιαίο λατινικό X',
+    pattern: '(?<=\\d)(\\s*)[xXΧχ×](\\s*)(?=\\d)',
+    replacement: '\\1X\\2',
+    scopeAll: true,
+  },
+};
+
+document.querySelectorAll('input[name="desc-mode"]').forEach(r => r.addEventListener('change', () => {
+  const rule = document.querySelector('input[name="desc-mode"]:checked').value === 'rule';
+  document.getElementById('desc-mode-merge').style.display = rule ? 'none' : '';
+  document.getElementById('desc-mode-rule').style.display = rule ? '' : 'none';
+}));
+
+document.getElementById('desc-rule-preset').addEventListener('change', e => {
+  const p = RULE_PRESETS[e.target.value];
+  if (!p) return;
+  document.getElementById('desc-rule-pattern').value = p.pattern;
+  document.getElementById('desc-rule-replacement').value = p.replacement;
+  document.getElementById('desc-rule-name').value = p.name;
+  document.getElementById('desc-rule-all').checked = !!p.scopeAll;
+  document.getElementById('desc-rule-result').innerHTML = '';
+  lastRulePreview = null;
+});
+
+document.getElementById('desc-rule-preview-btn').addEventListener('click', async () => {
+  const out = document.getElementById('desc-rule-result');
+  const btn = document.getElementById('desc-rule-preview-btn');
+  const pattern = document.getElementById('desc-rule-pattern').value;   // χωρίς trim: τα κενά μετράνε
+  const replacement = document.getElementById('desc-rule-replacement').value;
+  if (!pattern.trim()) { out.innerHTML = '<p class="muted-sm">Δώσε «Βρες» (regex).</p>'; return; }
+  const unlock = _lock(btn);
+  lastRulePreview = null;
+  try {
+    const scopeAll = document.getElementById('desc-rule-all').checked;
+    const items = scopeAll ? [] : [...descSelected.values()];
+    const p = await pyCallStrict('preview_description_rule', { items, pattern, replacement, scope_all: scopeAll });
+    if (p.lines_to_change > 0) {
+      const saveName = document.getElementById('desc-rule-save').checked ? document.getElementById('desc-rule-name').value.trim() : null;
+      lastRulePreview = { items, pattern, replacement, lines: p.lines_to_change, saveName, scopeAll };
+    }
+    const rows = p.changes.map(c => `
+      <tr>
+        <td>${descCatLabel(c.category)}</td>
+        <td style="font-size:12.5px;">${escapeHtml(c.old)}</td>
+        <td style="font-size:12.5px;"><b>${escapeHtml(c.new)}</b>${c.merges_into_existing ? ` <span class="badge badge-neutral" title="Η νέα περιγραφή υπάρχει ήδη στην ίδια κατηγορία — οι γραμμές ενώνονται με αυτήν">ήδη υπάρχει (${c.merges_into_existing})</span>` : ''}</td>
+        <td class="muted-sm">${c.line_count}</td>
+      </tr>`).join('');
+    out.innerHTML = `
+      <p>Θα αλλάξ${p.groups_to_change === 1 ? 'ει' : 'ουν'} <b>${p.groups_to_change}</b> ${p.groups_to_change === 1 ? 'περιγραφή' : 'περιγραφές'}
+        (<b>${p.lines_to_change}</b> γραμμ${p.lines_to_change === 1 ? 'ή' : 'ές'} σε <b>${p.invoices_to_change}</b> τιμολόγι${p.invoices_to_change === 1 ? 'ο' : 'α'})
+        <span class="muted-sm">· ${p.unchanged_groups} από τις ${p.selected_groups} ${scopeAll ? 'περιγραφές της βάσης' : 'επιλεγμένες'} δεν ταιριάζουν και μένουν όπως είναι</span></p>
+      ${p.changes.length ? `<div class="table-wrap" style="max-height:340px; overflow:auto;"><table>
+        <thead><tr><th>Κατηγορία</th><th>Παλιά</th><th>Νέα</th><th>Γραμμές</th></tr></thead><tbody>${rows}</tbody></table></div>
+        ${p.truncated ? '<p class="muted-sm">Εμφανίζονται οι πρώτες 500 αλλαγές — εφαρμόζονται όλες.</p>' : ''}` : ''}
+      ${lastRulePreview
+        ? `<p class="muted-sm" style="margin-top:8px;">Δεν έχει γραφτεί τίποτα ακόμα. Η αλλαγή καταγράφεται και αναιρείται από το «Ιστορικό αλλαγών».${lastRulePreview.saveName ? ` Θα αποθηκευτεί και ο μόνιμος κανόνας «${escapeHtml(lastRulePreview.saveName)}».` : ''}</p>
+           <div class="form-actions" style="margin-top:8px;"><button type="button" class="btn btn-primary" id="desc-rule-apply-btn">Εφαρμογή</button></div>`
+        : '<p class="muted-sm">Ο κανόνας δεν αλλάζει καμία από τις επιλεγμένες περιγραφές.</p>'}`;
+    if (document.getElementById('desc-rule-save').checked && !document.getElementById('desc-rule-name').value.trim()) {
+      out.insertAdjacentHTML('beforeend', '<p style="color:#856404;">⚠ Δώσε όνομα κανόνα για να αποθηκευτεί ως μόνιμος.</p>');
+      lastRulePreview = null;
+      document.getElementById('desc-rule-apply-btn')?.closest('.form-actions')?.remove();
+    }
+  } catch (e) {
+    out.innerHTML = `<p style="color:var(--danger);">${escapeHtml(e.message)}</p>`;
+  } finally {
+    unlock();
+  }
+});
+
+document.getElementById('desc-rule-result').addEventListener('click', async e => {
+  const btn = e.target.closest('#desc-rule-apply-btn');
+  if (!btn || !lastRulePreview) return;
+  const pv = lastRulePreview;
+  // το «αποθήκευση ως μόνιμος» διαβάζεται τώρα (όχι από την προεπισκόπηση), ώστε να ισχύει ό,τι βλέπει ο χρήστης
+  pv.saveName = document.getElementById('desc-rule-save').checked ? (document.getElementById('desc-rule-name').value.trim() || null) : null;
+  if (document.getElementById('desc-rule-save').checked && !pv.saveName) { App.toast('Δώσε όνομα κανόνα για να αποθηκευτεί ως μόνιμος', 'warn'); return; }
+  if (!await App.confirmAsync(`Να αλλάξ${pv.lines === 1 ? 'ει' : 'ουν'} ${pv.lines} γραμμ${pv.lines === 1 ? 'ή τιμολογίου' : 'ές τιμολογίων'} με τον κανόνα${pv.scopeAll ? ' ΣΕ ΟΛΗ ΤΗ ΒΑΣΗ' : ''};${pv.saveName ? ` Θα αποθηκευτεί και ως μόνιμος κανόνας «${pv.saveName}».` : ''} Μπορεί να αναιρεθεί από το Ιστορικό αλλαγών.`)) return;
+  const unlock = _lock(btn);
+  try {
+    const res = await pyCallStrict('apply_description_rule', {
+      items: pv.items, pattern: pv.pattern, replacement: pv.replacement, expected_lines: pv.lines, save_rule_name: pv.saveName,
+      scope_all: pv.scopeAll,
+    });
+    App.toast(`Άλλαξαν ${res.updated_groups} περιγραφές (${res.updated_rows} γραμμές σε ${res.updated_invoices} τιμολόγια)${res.saved_rule_id ? ' · αποθηκεύτηκε μόνιμος κανόνας' : ''}`, 'ok');
+    descSelected.clear();
+    lastRulePreview = null;
+    updateDescActionBox();
+    window.reloadLookups();
+    loadDescriptionChanges();
+    loadDescriptionRules();
+    loadDescriptionCandidates();
+    runDescSearch();
+  } catch (err) {
+    App.toast(err.message, 'fail');
+    unlock();
+  }
+});
+
+// ── ΜΟΝΙΜΟΙ ΚΑΝΟΝΕΣ ΠΕΡΙΓΡΑΦΗΣ ───────────────────────────────────────────────
+async function loadDescriptionRules() {
+  const el = document.getElementById('desc-rules-list');
+  const rules = await pyCall('list_description_rules') || [];
+  if (!rules.length) { el.innerHTML = '<p class="muted-sm">Κανένας μόνιμος κανόνας ακόμα.</p>'; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Όνομα</th><th>Βρες</th><th>Αντικατάσταση</th><th>Κατάσταση</th><th></th></tr></thead>
+    <tbody>${rules.map(r => `
+      <tr${r.active ? '' : ' style="opacity:.55;"'}>
+        <td>${escapeHtml(r.name)}</td>
+        <td style="font-family:monospace; font-size:12px;">${escapeHtml(r.pattern)}</td>
+        <td style="font-family:monospace; font-size:12px; white-space:pre;">${escapeHtml(r.replacement)}</td>
+        <td class="muted-sm">${r.active ? 'ενεργός' : 'ανενεργός'}</td>
+        <td style="white-space:nowrap;">
+          <button type="button" class="btn btn-outline btn-sm" data-rule-toggle="${r.id}" data-active="${r.active ? 1 : 0}">${r.active ? 'Απενεργοποίηση' : 'Ενεργοποίηση'}</button>
+          <button type="button" class="btn btn-outline btn-sm" data-rule-delete="${r.id}">Διαγραφή</button>
+        </td>
+      </tr>`).join('')}</tbody></table></div>`;
+}
+
+document.getElementById('desc-rules-list').addEventListener('click', async e => {
+  const tog = e.target.closest('[data-rule-toggle]');
+  const del = e.target.closest('[data-rule-delete]');
+  if (!tog && !del) return;
+  try {
+    if (tog) {
+      await pyCallStrict('set_description_rule_active', { rule_id: parseInt(tog.dataset.ruleToggle, 10), active: tog.dataset.active !== '1' });
+    } else {
+      if (!await App.confirmAsync('Να διαγραφεί ο μόνιμος κανόνας; Δεν επηρεάζονται τα ήδη καταχωρημένα.')) return;
+      await pyCallStrict('delete_description_rule', { rule_id: parseInt(del.dataset.ruleDelete, 10) });
+    }
+    loadDescriptionRules();
+  } catch (err) {
+    App.toast(err.message, 'fail');
+  }
+});
+
+// ── ΙΣΤΟΡΙΚΟ ΑΛΛΑΓΩΝ ΠΕΡΙΓΡΑΦΩΝ (με αναίρεση) ───────────────────────────────
+async function loadDescriptionChanges() {
+  const el = document.getElementById('desc-changes-list');
+  const changes = await pyCall('list_description_changes') || [];
+  if (!changes.length) { el.innerHTML = '<p class="muted-sm">Καμία αλλαγή ακόμα.</p>'; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Πότε</th><th>Τι άλλαξε</th><th>Από</th><th>Γραμμές</th><th></th></tr></thead>
+    <tbody>${changes.map(c => `
+      <tr${c.undone_at ? ' style="opacity:.55;"' : ''}>
+        <td class="muted-sm" style="white-space:nowrap;">${escapeHtml(fmtDateTime(c.created_at))}</td>
+        <td>${c.note ? `<span style="font-family:monospace; font-size:12px; white-space:pre-wrap;">${escapeHtml(c.note)}</span>` : ''}${c.new_description ? `Περιγραφή → <b>${escapeHtml(c.new_description)}</b>` : ''}${c.new_description && c.new_category ? '<br>' : ''}${c.new_category ? `Κατηγορία → <b>${escapeHtml(c.new_category)}</b>` : ''}</td>
+        <td class="muted-sm">${c.old_groups.map(g => `${g.category == null ? '—' : escapeHtml(g.category)} · ${escapeHtml(g.description)}${g.new_description ? ` → <b>${escapeHtml(g.new_description)}</b>` : ''} (${g.count})`).join('<br>')}${c.old_group_count > c.old_groups.length ? `<br>+${c.old_group_count - c.old_groups.length} ακόμα` : ''}</td>
+        <td class="muted-sm">${c.line_count}</td>
+        <td style="white-space:nowrap;">${c.undone_at
+          ? `<span class="muted-sm">αναιρέθηκε ${escapeHtml(fmtDateTime(c.undone_at))}</span>`
+          : `<button type="button" class="btn btn-outline btn-sm" data-desc-undo="${c.id}">Αναίρεση</button>`}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+}
+
+document.getElementById('desc-changes-list').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-desc-undo]');
+  if (!btn) return;
+  if (!await App.confirmAsync('Να αναιρεθεί αυτή η αλλαγή περιγραφών; Επαναφέρονται μόνο οι γραμμές που δεν έχουν αλλάξει από τότε.')) return;
+  const unlock = _lock(btn);
+  try {
+    const r = await pyCallStrict('undo_description_change', { change_id: parseInt(btn.dataset.descUndo, 10) });
+    const extra = [r.changed_since && `${r.changed_since} δεν αναιρέθηκαν (άλλαξαν από τότε)`, r.missing && `${r.missing} χάθηκαν (σβήστηκε/ξαναγράφτηκε το τιμολόγιο)`].filter(Boolean).join(' · ');
+    App.toast(`Επαναφέρθηκαν ${r.reverted} γραμμές${extra ? ' — ' + extra : ''}`, extra ? 'warn' : 'ok');
+    window.reloadLookups();
+    loadDescriptionChanges();
+    loadDescriptionCandidates();
+    runDescSearch();
+  } catch (err) {
+    App.toast(err.message, 'fail');
     unlock();
   }
 });

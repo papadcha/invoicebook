@@ -248,6 +248,38 @@ def handle(cmd, payload):
                 'η εξαγωγή εκρηκτικών θα δείχνει προειδοποίηση «νέο υλικό».')
         return res
 
+    if cmd == 'apply_description_change':
+        return database.apply_description_change(
+            payload.get('items') or [], payload.get('new_description'), payload.get('new_category'),
+            payload.get('expected_lines'))
+
+    if cmd == 'preview_description_rule':
+        return database.preview_description_rule(payload.get('items') or [], payload.get('pattern'), payload.get('replacement'),
+                                                 bool(payload.get('scope_all')))
+
+    if cmd == 'apply_description_rule':
+        return database.apply_description_rule(
+            payload.get('items') or [], payload.get('pattern'), payload.get('replacement'),
+            payload.get('expected_lines'), payload.get('save_rule_name'), bool(payload.get('scope_all')))
+
+    if cmd == 'list_description_rules':
+        return database.list_description_rules()
+
+    if cmd == 'add_description_rule':
+        return database.add_description_rule(payload.get('name'), payload.get('pattern'), payload.get('replacement'))
+
+    if cmd == 'set_description_rule_active':
+        return database.set_description_rule_active(_int_id(payload, 'rule_id'), bool(payload.get('active')))
+
+    if cmd == 'delete_description_rule':
+        return database.delete_description_rule(_int_id(payload, 'rule_id'))
+
+    if cmd == 'list_description_changes':
+        return database.list_description_changes()
+
+    if cmd == 'undo_description_change':
+        return database.undo_description_change(_int_id(payload, 'change_id'))
+
     if cmd == 'get_machine_merge_candidates':
         return database.get_machine_merge_candidates()
 

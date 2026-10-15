@@ -107,8 +107,8 @@
     <div class="card-title">Αναζήτηση περιγραφών</div>
     <p class="muted-sm" style="margin-bottom:14px;">
       Γράψε μέρος της περιγραφής (π.χ. «παλετ», «sae 15w40», «περιβαλλοντικ εισφορ») — κεφαλαία/τόνοι/κενά/παύλες δεν παίζουν ρόλο,
-      πολλές λέξεις = όλες πρέπει να υπάρχουν. Εμφανίζονται και γραμμές χωρίς κατηγορία. Τσέκαρε όσες θέλεις και δες προεπισκόπηση.
-      <b>Προς το παρόν μόνο προεπισκόπηση</b> — η εφαρμογή της αλλαγής (με αναίρεση) θα προστεθεί στο επόμενο βήμα.
+      πολλές λέξεις = όλες πρέπει να υπάρχουν. Εμφανίζονται και γραμμές χωρίς κατηγορία. Τσέκαρε όσες θέλεις, δες προεπισκόπηση και εφάρμοσε.
+      Κάθε αλλαγή καταγράφεται και αναιρείται από το «Ιστορικό αλλαγών» παρακάτω.
     </p>
     <div class="form-row" style="max-width:520px;">
       <div><label for="desc-search-input">Αναζήτηση</label><input type="text" id="desc-search-input" placeholder="π.χ. παλετ" autocomplete="off"></div>
@@ -116,16 +116,63 @@
     <p class="muted-sm" id="desc-search-summary"></p>
     <div id="desc-search-results"></div>
 
-    <div id="desc-action-box" style="display:none; margin-top:16px; padding-top:12px; border-top:1px solid var(--border, #ddd);">
+    <div id="desc-action-box" style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border, #ddd);">
       <p style="margin-bottom:8px;"><b id="desc-selected-count"></b>
         <button type="button" class="btn btn-outline btn-sm" id="desc-clear-selection-btn" style="margin-left:8px;">Καθαρισμός επιλογής</button></p>
-      <div class="form-row cols-2" style="max-width:720px;">
-        <div><label for="desc-new-description">Νέα περιγραφή (όλες οι επιλεγμένες γίνονται αυτή)</label><input type="text" id="desc-new-description" placeholder="Επίλεξε από τις επιλεγμένες ή γράψε νέα" autocomplete="off"></div>
-        <div><label for="desc-new-category">Νέα κατηγορία (προαιρετικό)</label><input type="text" id="desc-new-category" placeholder="Άφησέ το κενό για να μείνει ίδια" autocomplete="off"></div>
+      <p style="margin-bottom:12px;">
+        <label style="margin-right:18px;"><input type="radio" name="desc-mode" value="merge" checked style="width:auto; display:inline-block; margin:0 6px 0 0; vertical-align:middle;"> Ενοποίηση σε <b>μία</b> περιγραφή / αλλαγή κατηγορίας</label>
+        <label><input type="radio" name="desc-mode" value="rule" style="width:auto; display:inline-block; margin:0 6px 0 0; vertical-align:middle;"> <b>Κανόνας αντικατάστασης</b> (αλλάζει το πρόθεμα/μορφή κάθε περιγραφής ξεχωριστά)</label>
+      </p>
+
+      <div id="desc-mode-merge">
+        <div class="form-row cols-2" style="max-width:720px;">
+          <div><label for="desc-new-description">Νέα περιγραφή (όλες οι επιλεγμένες γίνονται αυτή)</label><input type="text" id="desc-new-description" placeholder="Επίλεξε από τις επιλεγμένες ή γράψε νέα" autocomplete="off"></div>
+          <div><label for="desc-new-category">Νέα κατηγορία (προαιρετικό)</label><input type="text" id="desc-new-category" placeholder="Άφησέ το κενό για να μείνει ίδια" autocomplete="off"></div>
+        </div>
+        <div class="form-actions" style="margin-top:0;"><button type="button" class="btn btn-outline" id="desc-preview-btn">Προεπισκόπηση</button></div>
+        <div id="desc-preview-result" style="margin-top:12px;"></div>
       </div>
-      <div class="form-actions" style="margin-top:0;"><button type="button" class="btn btn-outline" id="desc-preview-btn">Προεπισκόπηση</button></div>
-      <div id="desc-preview-result" style="margin-top:12px;"></div>
+
+      <div id="desc-mode-rule" style="display:none;">
+        <p class="muted-sm" style="margin-bottom:10px;">Εφαρμόζει το «Βρες» (regex, Python) στην περιγραφή κάθε επιλεγμένης γραμμής και το αντικαθιστά με το «Αντικατάσταση»
+          (<code>\1</code> για ομάδες). Μένει όπως είναι ό,τι δεν ταιριάζει. <b>Το κενό στο τέλος της αντικατάστασης μετράει.</b></p>
+        <div class="form-row" style="max-width:720px;">
+          <div><label for="desc-rule-preset">Έτοιμος κανόνας</label>
+            <select id="desc-rule-preset">
+              <option value="">— γράψε δικό σου —</option>
+              <option value="screws-prefix">Βίδες: πρόθεμα «ΒΙΔΕΣ ΑΤΣ. ΕΞ.» (από ΑΤΣ.ΕΞ. / ΑΤΣ.Ε. / ΑΤΣ.ΕΕ. / ΑΤΣ.ΕΞΕ. / ΑΤΣ.ΕΞΑΓ.)</option>
+              <option value="screws-inch">Βίδες (ίντσες): κενό μετά το «ΑΤΣ.» (π.χ. ΒΙΔΕΣ ΑΤΣ.8.8 UNC → ΒΙΔΕΣ ΑΤΣ. 8.8 UNC)</option>
+              <option value="sizes-x">Μεγέθη: ενιαίο λατινικό «X» ανάμεσα σε αριθμούς (16Χ60, 16x60 → 16X60) — σε όλη τη βάση</option>
+            </select></div>
+        </div>
+        <p style="margin-bottom:10px;"><label><input type="checkbox" id="desc-rule-all" style="width:auto; display:inline-block; margin:0 6px 0 0; vertical-align:middle;">
+          Εφάρμοσέ τον σε <b>ΟΛΕΣ</b> τις περιγραφές της βάσης (δεν χρειάζεται επιλογή από την αναζήτηση)</label></p>
+        <div class="form-row cols-2" style="max-width:720px;">
+          <div><label for="desc-rule-pattern">Βρες (regex)</label><input type="text" id="desc-rule-pattern" autocomplete="off" spellcheck="false" style="font-family:monospace;"></div>
+          <div><label for="desc-rule-replacement">Αντικατάσταση</label><input type="text" id="desc-rule-replacement" autocomplete="off" spellcheck="false" style="font-family:monospace;"></div>
+        </div>
+        <div class="form-row cols-2" style="max-width:720px; align-items:end;">
+          <div><label><input type="checkbox" id="desc-rule-save" style="width:auto; display:inline-block; margin:0 6px 0 0; vertical-align:middle;"> Αποθήκευση και ως <b>μόνιμος κανόνας</b> (εφαρμόζεται και στις νέες καταχωρήσεις)</label></div>
+          <div><label for="desc-rule-name">Όνομα κανόνα</label><input type="text" id="desc-rule-name" placeholder="π.χ. Βίδες: πρόθεμα ΑΤΣ. ΕΞ." autocomplete="off"></div>
+        </div>
+        <div class="form-actions" style="margin-top:0;"><button type="button" class="btn btn-outline" id="desc-rule-preview-btn">Προεπισκόπηση</button></div>
+        <div id="desc-rule-result" style="margin-top:12px;"></div>
+      </div>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Μόνιμοι κανόνες περιγραφής</div>
+    <p class="muted-sm" style="margin-bottom:10px;">Εφαρμόζονται σε κάθε <b>νέα</b> καταχώριση γραμμής (εισαγωγή/επεξεργασία), πριν την αντιστοίχιση με υπάρχουσα περιγραφή και μετά από αυτήν,
+      ώστε το πρότυπο (π.χ. «ΒΙΔΕΣ ΑΤΣ. ΕΞ.») να κρατιέται. Δεν αλλάζουν τα ήδη καταχωρημένα — γι' αυτά χρησιμοποίησε τον «Κανόνα αντικατάστασης» παραπάνω.</p>
+    <div id="desc-rules-list"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Ιστορικό αλλαγών περιγραφών</div>
+    <p class="muted-sm" style="margin-bottom:10px;">Η αναίρεση επαναφέρει μόνο γραμμές που δεν έχουν αλλάξει από τότε (νεότερη αλλαγή ή χειροκίνητη διόρθωση).
+      Η παλιά «Συγχώνευση όλων» των υποψηφίων ομαδοποιήσεων παρακάτω δεν καταγράφεται εδώ.</p>
+    <div id="desc-changes-list"></div>
   </div>
 
   <div class="card">
